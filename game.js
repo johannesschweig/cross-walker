@@ -1,14 +1,17 @@
 /*
  * Cross Walker – a tiny tile puzzle game, ported from a Godot 4.3 prototype
- * (the original sources live on the `main` branch).
+ * (the original sources live in the git history).
  *
  * Rules
  *   - You move exactly one tile per step (hold a key / keep your finger down to keep walking).
- *   - Walk onto the door to finish a level and move on to the next one.
- *   - Gold is collected by stepping on it. Gold carries over between levels.
- *   - Fire kills you: you lose ALL gold and the level restarts.
+ *   - Walk onto the door to finish a level. Pick up gold on the way.
+ *   - Fire kills you: the level restarts and the gold you picked up in it is lost.
  *   - Water can't be crossed. Push a crate into it and the crate stays there as a floating
  *     bridge you can walk over. Crates can't be pushed onto a bridge, and can't be pulled.
+ *   - Push a crate into fire and the crate burns up (the fire stays). That's how you get rid of a
+ *     crate you don't need.
+ *   - Stars per level: 1 for finishing, 2 for also collecting all its gold, 3 for doing that
+ *     within 25% of the level's par (the fewest steps that collect all gold).
  *   - On a keyboard, Z or Backspace takes back your last step (there is no undo button).
  *
  * Controls: arrows / WASD / swipe anywhere on the board / on-screen d-pad. R = restart.
@@ -24,18 +27,22 @@
   const FADE_TIME = 0.35;       // s fade-in when a level starts
   const SWIPE_DIST = 16;        // css px a finger has to travel before it counts as a direction
   const UNDO_LIMIT = 400;
+  const EXIT_TIME = 0.65;       // s the player takes to walk into the door
+  const BURN_TIME = 0.8;        // s a crate takes to burn up
+  const THREE_STAR_SLACK = 1.25; // 3 stars: all gold within par * this many steps
 
   // ---- Levels -------------------------------------------------------------------------------
   // #  brick (solid)     .  floor            S  start
   // ~  water (solid)     g  gold             D  door (level goal)
   // F  fire (deadly)     c  crate (pushable)
   // Internally a filled water tile becomes 'w' (water with a floating crate; walkable).
-  // Every level was checked with a solver to make sure it can be finished (and that all its
-  // gold can be collected on the way to the door).
+  // `par` = fewest steps that collect all gold and reach the door.
+  // `node tools/check-levels.js` verifies every level (solvable, all gold collectable, par).
   const LEVELS = [
   {
-    name: 'First Steps',
+    name: "First Steps",
     hint: "Collect the gold and reach the door.",
+    par: 13,
     rows: [
       "########",
       "#S.....#",
@@ -47,8 +54,9 @@
     ],
   },
   {
-    name: 'Warm Hands',
-    hint: "Fire burns. Touch it and you lose all your gold.",
+    name: "Warm Hands",
+    hint: "Fire burns. Touch it and the level starts over.",
+    par: 16,
     rows: [
       "########",
       "#S.....#",
@@ -61,8 +69,9 @@
     ],
   },
   {
-    name: 'Splash',
+    name: "Splash",
     hint: "Push a crate into water to make a bridge.",
+    par: 10,
     rows: [
       "#########",
       "#S...~.D#",
@@ -72,8 +81,9 @@
     ],
   },
   {
-    name: 'Corner Pocket',
+    name: "Corner Pocket",
     hint: "Crates only go straight. Plan your turns.",
+    par: 18,
     rows: [
       "########",
       "#S.....#",
@@ -86,21 +96,36 @@
     ],
   },
   {
-    name: 'Go Around',
-    hint: "Fire blocks the lane. Find another way.",
+    name: "Burn It",
+    hint: "Fire eats crates. Use it to clear the way.",
+    par: 20,
     rows: [
       "#########",
-      "#S....~g#",
-      "#.....~.#",
-      "#.cc.F~.#",
-      "#.....~.#",
-      "#g....~D#",
+      "#S.....g#",
+      "####.####",
+      "#D..c..g#",
+      "####F####",
       "#########",
     ],
   },
   {
-    name: 'Two Gates',
+    name: "Too Many Crates",
+    hint: "You don't need them all. Fire can get rid of one.",
+    par: 23,
+    rows: [
+      "##########",
+      "#S.F.Fcg.#",
+      "#.....c.F#",
+      "#.Fcg....#",
+      "###~##~###",
+      "#.g.#...D#",
+      "##########",
+    ],
+  },
+  {
+    name: "Two Gates",
     hint: "Only one gate leads to the door. The other hides gold.",
+    par: 25,
     rows: [
       "##########",
       "#S.gF...g#",
@@ -112,8 +137,9 @@
     ],
   },
   {
-    name: 'Moat',
+    name: "Moat",
     hint: "The door is an island. Where to build the bridge?",
+    par: 24,
     rows: [
       "##########",
       "#S.c....F#",
@@ -126,8 +152,9 @@
     ],
   },
   {
-    name: 'Two Rivers',
+    name: "Two Rivers",
     hint: "Each river needs its own crate.",
+    par: 26,
     rows: [
       "###########",
       "#S.g~.gF~.#",
@@ -139,23 +166,23 @@
     ],
   },
   {
-    name: 'Fire Garden',
-    hint: "Think before you push.",
+    name: "Crate Jam",
+    hint: "Three crates side by side. They can't all be useful.",
+    par: 31,
     rows: [
-      "#########",
-      "#S..g...#",
-      "#.c...g.#",
-      "#..cF...#",
-      "#.g..F..#",
-      "#F.F....#",
-      "####~####",
-      "#...D.c.#",
-      "#########",
+      "##########",
+      "#S..F.F..#",
+      "#..cccg..#",
+      "#..g.F...#",
+      "###~##~###",
+      "#.g.#...D#",
+      "##########",
     ],
   },
   {
-    name: 'Island Hop',
+    name: "Island Hop",
     hint: "Fire guards the shore.",
+    par: 28,
     rows: [
       "##########",
       "#S.gF...c#",
@@ -168,8 +195,9 @@
     ],
   },
   {
-    name: 'Long River',
+    name: "Long River",
     hint: "Take your time. Think a few pushes ahead.",
+    par: 32,
     rows: [
       "###########",
       "#S..~..g~F#",
@@ -181,8 +209,9 @@
     ],
   },
   {
-    name: 'Grand Tour',
+    name: "Grand Tour",
     hint: "A river, then an island. Two crates, two crossings.",
+    par: 46,
     rows: [
       "############",
       "#S..~...F.F#",
@@ -212,6 +241,8 @@
     stage: $('stage'), menu: $('menu'), levelGrid: $('levelGrid'),
     end: $('end'), endGold: $('endGold'), sound: $('sound'),
     dpad: $('dpad'), dpadToggle: $('dpadToggle'),
+    moves: $('moves'), result: $('result'), resultTitle: $('resultTitle'), resultStars: $('resultStars'),
+    resultInfo: $('resultInfo'), resultTip: $('resultTip'), resultNext: $('resultNext'), resultRetry: $('resultRetry'),
   };
   const coarse = matchMedia('(pointer: coarse)').matches;
 
@@ -241,9 +272,12 @@
     gold: 0,
     goldAtLevelStart: 0,
     levelGoldTotal: 0,
-    mode: 'play',      // 'play' | 'dying' | 'end'
+    mode: 'play',      // 'play' | 'dying' | 'exiting' | 'result' | 'end'
     modeTime: 0,
     fade: 0,
+    time: 0,           // seconds since start, drives idle animations
+    moves: 0,
+    effects: [],       // short-lived visual effects, e.g. { type: 'burn', gx, gy, t, dur }
     grid: [],          // array of arrays of tile characters
     w: 1, h: 1,
     crates: [],        // { gx, gy, toX, toY }
@@ -256,11 +290,12 @@
 
   // ---- Progress (remembered between visits) ------------------------------------------------------
   const PROGRESS_KEY = 'cw-progress';
-  function saveProgress() {
+  function writeProgress(level, gold) {
     try {
-      localStorage.setItem(PROGRESS_KEY, JSON.stringify({ level: game.level, gold: game.goldAtLevelStart }));
+      localStorage.setItem(PROGRESS_KEY, JSON.stringify({ level, gold }));
     } catch (_) { /* storage unavailable */ }
   }
+  const saveProgress = () => writeProgress(game.level, game.goldAtLevelStart);
   function loadProgress() {
     try {
       const p = JSON.parse(localStorage.getItem(PROGRESS_KEY) || 'null');
@@ -274,13 +309,22 @@
     try { localStorage.removeItem(PROGRESS_KEY); } catch (_) { /* ignore */ }
   }
 
+  // Best result per level: { [levelIndex]: { stars, moves } }
+  const STARS_KEY = 'cw-stars';
+  let best = {};
+  try { best = JSON.parse(localStorage.getItem(STARS_KEY) || '{}') || {}; } catch (_) { best = {}; }
+  const saveBest = () => { try { localStorage.setItem(STARS_KEY, JSON.stringify(best)); } catch (_) { /* ignore */ } };
+  const starText = (n) => '★'.repeat(n) + '☆'.repeat(3 - n);
+  const totalStars = () => Object.values(best).reduce((n, b) => n + (b.stars | 0), 0);
+
   // ---- HUD ---------------------------------------------------------------------------------------
   function updateHud() {
     const def = LEVELS[game.level];
     el.level.textContent = `Level ${game.level + 1}/${LEVELS.length}`;
     el.title.textContent = def.name;
+    el.moves.textContent = `Steps ${game.moves} · par ${def.par}`;
     const got = game.levelGoldTotal - goldLeft();
-    el.gold.innerHTML = `★ ${game.gold}` +
+    el.gold.innerHTML = `● ${game.gold}` +
       (game.levelGoldTotal ? `<small>${got}/${game.levelGoldTotal}</small>` : '');
     el.hint.textContent = game.level === 0
       ? (dpadOn ? 'Use the arrows to walk.' : coarse ? 'Swipe anywhere on the board to walk.' : def.hint)
@@ -311,6 +355,9 @@
     player.t = 1; player.moving = false; player.pushed = null; player.steps = 0;
     held.length = 0; queued = null;     // make the player press a key again after (re)starting
     game.undo = [];
+    game.moves = 0;
+    game.effects = [];
+    el.result.hidden = true;
     game.goldAtLevelStart = game.gold;
     game.levelGoldTotal = goldLeft();
     game.mode = 'play';
@@ -420,6 +467,7 @@
     splash: () => blip([300, 200, 140], 0.2, 0.05),
     win: () => blip([523, 659, 784, 1047], 0.4, 0.05),
     undo: () => blip([300, 220], 0.06, 0.04),
+    burn: () => blip([700, 420, 640, 260, 480, 180], 0.45, 0.05),
     fire: () => { if (muted) return; fireSound.currentTime = 0; fireSound.play().catch(() => {}); },
   };
 
@@ -559,6 +607,7 @@
       crates: game.crates.map((c) => [c.gx, c.gy]),
       gx: player.gx, gy: player.gy,
       gold: game.gold,
+      moves: game.moves,
     };
   }
   function undo() {
@@ -570,6 +619,8 @@
     player.gy = player.fromY = s.gy;
     player.t = 1; player.moving = false; player.pushed = null;
     game.gold = s.gold;
+    game.moves = s.moves;
+    game.effects = [];
     queued = null;
     sfx.undo();
     updateHud();
@@ -592,7 +643,8 @@
     LEVELS.forEach((_, i) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.textContent = String(i + 1);
+      const n = best[i] ? best[i].stars : 0;
+      b.innerHTML = `<b>${i + 1}</b><small>${starText(n)}</small>`;
       if (i === game.level) b.className = 'current';
       b.addEventListener('click', () => { el.menu.hidden = true; loadLevel(i); });
       el.levelGrid.appendChild(b);
@@ -612,6 +664,7 @@
     else if (e.code === 'KeyM') setMuted(!muted);
     else if (e.code === 'Enter' || e.code === 'Space') {
       if (game.mode === 'end') { clearProgress(); newGame(); }
+      else if (game.mode === 'result') nextLevel();
       e.preventDefault();
     }
   });
@@ -624,8 +677,8 @@
   // ---- Rules: one step at a time -----------------------------------------------------------------
   const crateCanEnter = (gx, gy) => {
     const ch = tileAt(gx, gy);
-    // floor, gold or open water only: never bricks, fire, the door, or an existing bridge
-    return (ch === '.' || ch === 'g' || ch === '~') && !crateAt(gx, gy);
+    // floor, gold, open water or fire (the crate burns up): never bricks, the door, or a bridge
+    return (ch === '.' || ch === 'g' || ch === '~' || ch === 'F') && !crateAt(gx, gy);
   };
 
   // Returns true if the step started.
@@ -644,6 +697,8 @@
     }
     game.undo.push(snapshot());
     if (game.undo.length > UNDO_LIMIT) game.undo.shift();
+    game.moves++;
+    updateHud();
     player.fromX = player.gx; player.fromY = player.gy;
     player.gx = nx; player.gy = ny;
     player.pushed = crate || null;
@@ -664,6 +719,10 @@
         game.grid[crate.gy][crate.gx] = 'w';
         game.crates.splice(game.crates.indexOf(crate), 1);
         sfx.splash();
+      } else if (tileAt(crate.gx, crate.gy) === 'F') {   // the crate burns up; the fire stays
+        game.crates.splice(game.crates.indexOf(crate), 1);
+        game.effects.push({ type: 'burn', gx: crate.gx, gy: crate.gy, t: 0, dur: BURN_TIME });
+        sfx.burn();
       }
     }
 
@@ -675,19 +734,53 @@
       sfx.gold();
       updateHud();
     } else if (ch === 'D') {
+      game.mode = 'exiting';                 // walk into the door, then show the result
+      game.modeTime = 0;
+      held.length = 0; queued = null;
       sfx.win();
-      if (game.level + 1 < LEVELS.length) {
-        loadLevel(game.level + 1);
-      } else {
-        game.mode = 'end';
-        game.modeTime = 0;
-        held.length = 0; queued = null;
-        clearProgress();
-        el.endGold.textContent = `★ ${game.gold} gold`;
-        el.end.hidden = false;
-      }
     }
   }
+
+  function completeLevel() {
+    const def = LEVELS[game.level];
+    const got = game.levelGoldTotal - goldLeft();
+    const allGold = got === game.levelGoldTotal;
+    const limit = Math.ceil(def.par * THREE_STAR_SLACK);
+    const n = allGold ? (game.moves <= limit ? 3 : 2) : 1;
+    const prev = best[game.level];
+    if (!prev || n > prev.stars || (n === prev.stars && game.moves < prev.moves)) {
+      best[game.level] = { stars: n, moves: game.moves };
+      saveBest();
+    }
+    const last = game.level + 1 >= LEVELS.length;
+    if (last) clearProgress(); else writeProgress(game.level + 1, game.gold);
+
+    game.mode = 'result';
+    el.resultTitle.textContent = n === 3 ? 'Perfect!' : 'Level complete';
+    el.resultStars.textContent = starText(n);
+    el.resultInfo.textContent = `${game.moves} steps · par ${def.par} · gold ${got}/${game.levelGoldTotal}`;
+    el.resultTip.textContent = n === 3 ? '' : !allGold ? 'Collect all the gold for ★★.'
+      : `Collect all the gold in ${limit} steps or fewer for ★★★.`;
+    el.resultNext.textContent = last ? 'Finish' : 'Next level';
+    el.result.hidden = false;
+    el.resultNext.focus({ preventScroll: true });
+    renderLevelGrid();
+  }
+
+  function nextLevel() {
+    el.result.hidden = true;
+    if (game.level + 1 < LEVELS.length) { loadLevel(game.level + 1); return; }
+    game.mode = 'end';
+    game.modeTime = 0;
+    el.endGold.textContent = `● ${game.gold} gold · ★ ${totalStars()}/${LEVELS.length * 3}`;
+    el.end.hidden = false;
+  }
+  el.resultNext.addEventListener('click', nextLevel);
+  el.resultRetry.addEventListener('click', () => {
+    el.result.hidden = true;
+    game.gold = game.goldAtLevelStart;       // replaying a level doesn't count its gold twice
+    loadLevel(game.level);
+  });
 
   function die() {
     game.mode = 'dying';
@@ -698,14 +791,22 @@
   }
 
   function update(dt) {
+    game.time += dt;
     if (game.fade > 0) game.fade -= dt;
+    for (const e of game.effects) e.t += dt;
+    if (game.effects.length) game.effects = game.effects.filter((e) => e.t < e.dur);
 
     if (game.mode === 'dying') {
       game.modeTime += dt;
       if (game.modeTime >= DEATH_TIME) {
-        game.gold = 0;                                    // fire takes all your gold
+        game.gold = game.goldAtLevelStart;                // the fire takes the gold you picked up here
         loadLevel(game.level);
       }
+      return;
+    }
+    if (game.mode === 'exiting') {
+      game.modeTime += dt;
+      if (game.modeTime >= EXIT_TIME) completeLevel();
       return;
     }
     if (game.mode !== 'play') return;
@@ -745,6 +846,14 @@
     });
   }
 
+  // Small deterministic pseudo-random number in 0..1 for a tile, so every tile animates out of step.
+  const hash = (x, y, k = 0) => {
+    const n = Math.sin(x * 127.1 + y * 311.7 + k * 74.7) * 43758.5453;
+    return n - Math.floor(n);
+  };
+  const scratch = document.createElement('canvas');   // used to tint burning crates
+  const scratchCtx = scratch.getContext('2d');
+
   function draw(tilesheet, spritesheet) {
     // Everything is drawn in device pixels with a whole number of pixels per tile, so tiles
     // meet exactly (no hairline seams) and the pixel art stays crisp at any screen size.
@@ -759,31 +868,117 @@
     const oy = Math.floor((V - game.h * T) / 2);
     const px = (gx) => ox + Math.round(gx * T);
     const py = (gy) => oy + Math.round(gy * T);
+    const time = game.time;
 
-    const cell = (name, gx, gy) => {
+    const sprite = (name, x, y, w = T, h = T) => {
       const [c, r] = SPR[name];
-      ctx.drawImage(tilesheet, c * SRC, r * SRC, SRC, SRC, px(gx), py(gy), T, T);
+      ctx.drawImage(tilesheet, c * SRC, r * SRC, SRC, SRC, Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+    };
+    const cell = (name, gx, gy) => sprite(name, px(gx), py(gy));
+
+    // Water: two light ripples drift slowly across the tile, and now and then a pixel sparkles.
+    const waterFx = (tx, ty) => {
+      const x0 = px(tx), y0 = py(ty);
+      const w = Math.max(2, Math.round(T * 0.28)), h = Math.max(1, Math.round(T * 0.045));
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      for (let k = 0; k < 2; k++) {
+        const ph = hash(tx, ty, k) * 6.28;
+        const xx = x0 + Math.round((T - w) * (0.5 + 0.5 * Math.sin(time * 0.9 + ph)));
+        const yy = y0 + Math.round(T * (0.26 + 0.42 * k) + Math.sin(time * 1.3 + ph) * T * 0.03);
+        ctx.fillRect(xx, yy, w, h);
+      }
+      const s = (time * 0.45 + hash(tx, ty, 3)) % 1;
+      if (s < 0.3) {
+        ctx.fillStyle = `rgba(255,255,255,${0.9 * Math.sin((s / 0.3) * Math.PI)})`;
+        const sz = Math.max(1, Math.round(T * 0.05));
+        ctx.fillRect(x0 + Math.round(T * (0.15 + 0.7 * hash(tx, ty, 4))), y0 + Math.round(T * (0.15 + 0.7 * hash(tx, ty, 5))), sz, sz);
+      }
     };
 
+    // Fire: a soft glow, a flame that breathes (smooth, bottom-anchored) and two rising embers.
+    const fireFx = (tx, ty) => {
+      const x0 = px(tx), y0 = py(ty), ph = hash(tx, ty) * 6.28;
+      const cx = x0 + T / 2, cy = y0 + T * 0.62;
+      const glow = ctx.createRadialGradient(cx, cy, T * 0.05, cx, cy, T * 0.8);
+      const a = 0.2 + 0.05 * Math.sin(time * 2.2 + ph);
+      glow.addColorStop(0, `rgba(255,150,40,${a})`);
+      glow.addColorStop(1, 'rgba(255,150,40,0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(cx - T, cy - T, 2 * T, 2 * T);
+      const s = Math.sin(time * 4 + ph);
+      const h = T * (1 + 0.05 * s), w = T * (1 - 0.025 * s);
+      sprite('fire', x0 + (T - w) / 2, y0 + T - h, w, h);
+      const sz = Math.max(1, Math.round(T * 0.05));
+      for (let k = 0; k < 2; k++) {
+        const p = (time * 0.7 + hash(tx, ty, k + 5)) % 1;
+        ctx.fillStyle = `rgba(255,${210 - Math.round(p * 100)},60,${(1 - p) * 0.9})`;
+        ctx.fillRect(Math.round(cx + Math.sin(p * 7 + k * 3 + ph) * T * 0.14), Math.round(y0 + T * 0.55 - p * T * 0.55), sz, sz);
+      }
+    };
+
+    // A crate that was pushed into fire: it chars, shrinks and burns away in a burst of embers.
+    const burnFx = (e) => {
+      const k = e.t / e.dur;
+      const x0 = px(e.gx), y0 = py(e.gy);
+      const cx = x0 + T / 2, cy = y0 + T / 2;
+      if (scratch.width !== T) scratch.width = scratch.height = T;
+      scratchCtx.imageSmoothingEnabled = false;
+      scratchCtx.globalCompositeOperation = 'source-over';
+      scratchCtx.clearRect(0, 0, T, T);
+      scratchCtx.drawImage(tilesheet, SPR.crate[0] * SRC, SPR.crate[1] * SRC, SRC, SRC, 0, 0, T, T);
+      scratchCtx.globalCompositeOperation = 'source-atop';
+      scratchCtx.fillStyle = `rgba(15,8,0,${Math.min(0.9, k * 1.6)})`;
+      scratchCtx.fillRect(0, 0, T, T);
+      const sz = Math.round(T * (1 - 0.45 * k));
+      ctx.save();
+      ctx.globalAlpha = k < 0.6 ? 1 : 1 - (k - 0.6) / 0.4;
+      ctx.drawImage(scratch, Math.round(x0 + (T - sz) / 2), Math.round(y0 + T - sz), sz, sz);
+      ctx.restore();
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.sin(Math.min(1, k * 1.2) * Math.PI));
+      const fh = T * (1.05 + 0.25 * k), fw = T * (1 + 0.1 * k);
+      sprite('fire', x0 + (T - fw) / 2, y0 + T - fh, fw, fh);
+      ctx.restore();
+      const dot = Math.max(2, Math.round(T * 0.07));
+      for (let i = 0; i < 10; i++) {
+        const ang = -Math.PI / 2 + (hash(i, 1) - 0.5) * 2.2;
+        const dist = (0.3 + hash(i, 2) * 0.8) * T * k;
+        ctx.fillStyle = `rgba(255,${190 - Math.round(hash(i, 3) * 90)},50,${Math.max(0, 1 - k)})`;
+        ctx.fillRect(Math.round(cx + Math.cos(ang) * dist), Math.round(cy + Math.sin(ang) * dist + k * k * T * 0.5), dot, dot);
+      }
+    };
+
+    // 1. base tiles
     for (let ty = 0; ty < game.h; ty++) {
       for (let tx = 0; tx < game.w; tx++) {
         const ch = game.grid[ty][tx];
         if (ch === '#') cell('brick', tx, ty);
-        else if (ch === '~') cell('water', tx, ty);
-        else if (ch === 'w') {                    // crate floating on water
-          cell('water', tx, ty);
-          ctx.fillStyle = '#e3c9a0';              // plank colour, so the crate reads clearly on blue
-          const pad = Math.round(T * 0.125);
-          ctx.fillRect(px(tx) + pad, py(ty) + pad, T - 2 * pad, T - 2 * pad);
-          cell('crate', tx, ty);
-        } else {
+        else if (ch === '~' || ch === 'w') cell('water', tx, ty);
+        else {
           cell('floor', tx, ty);
           if (ch === 'g') cell('gold', tx, ty);
           else if (ch === 'D') cell('door', tx, ty);
-          else if (ch === 'F') cell('fire', tx, ty);
         }
       }
     }
+
+    // 2. things that move on their own: water, floating crates, fire
+    for (let ty = 0; ty < game.h; ty++) {
+      for (let tx = 0; tx < game.w; tx++) {
+        const ch = game.grid[ty][tx];
+        if (ch === '~') waterFx(tx, ty);
+        else if (ch === 'w') {                    // crate floating on water: bobs gently
+          waterFx(tx, ty);
+          const bob = Math.round(Math.sin(time * 2 + hash(tx, ty) * 6.28) * T * 0.025);
+          ctx.fillStyle = '#e3c9a0';              // plank colour, so the crate reads clearly on blue
+          const pad = Math.round(T * 0.125);
+          ctx.fillRect(px(tx) + pad, py(ty) + pad + bob, T - 2 * pad, T - 2 * pad);
+          sprite('crate', px(tx), py(ty) + bob);
+        } else if (ch === 'F') fireFx(tx, ty);
+      }
+    }
+
+    for (const e of game.effects) if (e.type === 'burn') burnFx(e);
 
     const t = player.moving ? Math.min(1, player.t) : 1;
     for (const c of game.crates) {
@@ -791,22 +986,41 @@
       cell('crate', c.gx + (c.toX - c.gx) * k, c.gy + (c.toY - c.gy) * k);
     }
 
-    // Player
+    // 3. the player
     const sx = px(player.fromX + (player.gx - player.fromX) * t);
     const sy = py(player.fromY + (player.gy - player.fromY) * t);
     const frame = player.moving ? 1 + (player.steps % (FRAMES - 1)) : 0;
-    ctx.save();
     if (game.mode === 'dying') {
       const k = game.modeTime / DEATH_TIME;
+      ctx.save();
       ctx.translate(sx + T / 2, sy + T / 2);
       ctx.rotate(k * 10);
       ctx.scale(1 - k * 0.6, 1 - k * 0.6);
       ctx.globalAlpha = 1 - k;
       ctx.drawImage(spritesheet, 0, 0, SRC, SRC, -T / 2, -T / 2, T, T);
-    } else if (game.mode !== 'end') {
+      ctx.restore();
+    } else if (game.mode === 'exiting') {
+      // The door lights up and the player shrinks into it, as if walking inside.
+      const k = Math.min(1, game.modeTime / EXIT_TIME);
+      const dx0 = px(player.gx), dy0 = py(player.gy);
+      ctx.fillStyle = `rgba(255,236,160,${0.8 * Math.sin(Math.min(1, k * 1.1) * Math.PI)})`;
+      ctx.fillRect(dx0 + Math.round(T * 0.2), dy0 + Math.round(T * 0.25), Math.round(T * 0.6), Math.round(T * 0.75));
+      ctx.save();
+      ctx.translate(dx0 + T / 2, dy0 + T / 2 - T * 0.12 * k);
+      ctx.scale(1 - 0.75 * k, 1 - 0.75 * k);
+      ctx.globalAlpha = 1 - k * k;
+      ctx.drawImage(spritesheet, 0, 0, SRC, SRC, -T / 2, -T / 2, T, T);
+      ctx.restore();
+      const dot = Math.max(2, Math.round(T * 0.06));
+      for (let i = 0; i < 8; i++) {
+        const ang = (i / 8) * Math.PI * 2 + 0.4;
+        const dist = (0.2 + 0.55 * k) * T;
+        ctx.fillStyle = `rgba(255,240,170,${Math.sin(k * Math.PI)})`;
+        ctx.fillRect(Math.round(dx0 + T / 2 + Math.cos(ang) * dist), Math.round(dy0 + T * 0.6 + Math.sin(ang) * dist), dot, dot);
+      }
+    } else if (game.mode === 'play') {
       ctx.drawImage(spritesheet, frame * SRC, 0, SRC, SRC, sx, sy, T, T);
     }
-    ctx.restore();
 
     if (game.mode === 'dying') {
       ctx.fillStyle = `rgba(255,60,0,${0.35 * (1 - game.modeTime / DEATH_TIME)})`;

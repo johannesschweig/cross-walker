@@ -21,7 +21,10 @@
       <button id="levelBtn" type="button" aria-label="Choose level">
         <span id="level">Level 1/1</span> <span class="caret">▾</span>
       </button>
-      <div id="title">–</div>
+      <div id="center">
+        <div id="title">–</div>
+        <div id="moves"></div>
+      </div>
       <div id="gold" aria-live="polite">★ 0</div>
     </header>
 
@@ -50,6 +53,19 @@
       <h2>Levels</h2>
       <div id="levelGrid"></div>
       <button id="menuClose" type="button" class="primary">Close</button>
+    </div>
+  </div>
+
+  <div id="result" class="overlay" hidden>
+    <div class="panel">
+      <h2 id="resultTitle">Level complete</h2>
+      <div id="resultStars" class="stars" aria-live="polite"></div>
+      <p id="resultInfo" class="info"></p>
+      <p id="resultTip" class="tip"></p>
+      <div class="row">
+        <button id="resultRetry" type="button">Retry</button>
+        <button id="resultNext" type="button" class="primary">Next level</button>
+      </div>
     </div>
   </div>
 

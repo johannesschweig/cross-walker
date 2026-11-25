@@ -1,6 +1,6 @@
 # Cross Walker
 
-A tiny puzzle game for phones: collect gold, dodge fire, bridge rivers with crates. 12 levels. Plain HTML/CSS/JavaScript, no build step.
+A tiny puzzle game for phones: collect gold, dodge fire, bridge rivers with crates. 13 levels, each with up to three stars. Plain HTML/CSS/JavaScript, no build step.
 
 **Play:** https://cross-walker.vercel.app
 
@@ -10,9 +10,11 @@ Originally a Godot 4.3 prototype; that version is in the git history.
 
 - You move one tile per step. Walk onto the **door** to finish a level.
 - **Gold** is optional, and every level lets you collect all of it.
-- **Fire** kills you: you lose all your gold and the level restarts.
+- **Fire** kills you: the level restarts and you lose the gold you picked up in it.
 - **Water** blocks you. Push a **crate** into it and it floats there as a bridge.
+- Push a **crate into fire** and the crate burns up (the fire stays). That's how you get rid of a crate you don't need.
 - Crates move one tile in a straight line. They can't be pulled or pushed onto a bridge.
+- **Stars:** ★ for finishing, ★★ for also collecting all the gold, ★★★ for doing that within 25% of par (the fewest steps that collect all the gold). Your best result per level is saved.
 
 | | Phone | Keyboard |
 | --- | --- | --- |
@@ -20,7 +22,7 @@ Originally a Godot 4.3 prototype; that version is in the git history.
 | Restart level | Restart button | R |
 | Undo last step | – | Z or Backspace |
 | Sound | Sound button | M |
-| Pick a level | Tap "Level n/12" | Click "Level n/12" |
+| Pick a level | Tap "Level n/13" | Click "Level n/13" |
 
 The game is portrait-only. Progress, sound and d-pad settings are saved in the browser.
 
@@ -42,7 +44,7 @@ vercel --prod
 
 ## Editing levels
 
-Levels are the `LEVELS` array at the top of `game.js`: text grids with a brick border, drawn as large as fits.
+Levels are the `LEVELS` array at the top of `game.js`: text grids with a brick border, drawn as large as fits. Each has a `par` (see Stars above).
 
 | Char | Tile | | Char | Tile |
 | --- | --- | --- | --- | --- |
@@ -51,7 +53,7 @@ Levels are the `LEVELS` array at the top of `game.js`: text grids with a brick b
 | `S` | start (one) | | `c` | crate |
 | `D` | door (one) | | `g` | gold |
 
-Crates make levels easy to break, so check them after every change:
+Crates make levels easy to break, so check them after every change. The checker confirms each level is solvable with all its gold collectable, and that `par` is right (`--write` fixes wrong par values):
 
 ```bash
 node tools/check-levels.js
