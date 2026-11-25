@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Cross Walker</title>
+  <meta name="description" content="A tiny puzzle game: collect gold, dodge fire, bridge rivers with crates.">
+  <meta name="theme-color" content="#2b2b2b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Cross Walker">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header id="hud">
+      <button id="levelBtn" type="button" aria-label="Choose level">
+        <span id="level">Level 1/1</span> <span class="caret">▾</span>
+      </button>
+      <div id="title">–</div>
+      <div id="gold" aria-live="polite">★ 0</div>
+    </header>
+
+    <main id="stage">
+      <canvas id="game" width="512" height="512" aria-label="Cross Walker game board"></canvas>
+    </main>
+
+    <footer id="bar">
+      <p id="hint"></p>
+      <div id="dpad" hidden aria-label="Direction pad">
+        <button type="button" data-dir="up" aria-label="Up">▲</button>
+        <button type="button" data-dir="left" aria-label="Left">◀</button>
+        <button type="button" data-dir="right" aria-label="Right">▶</button>
+        <button type="button" data-dir="down" aria-label="Down">▼</button>
+      </div>
+      <div id="buttons">
+        <button id="restart" type="button" aria-label="Restart level">⟳<span>Restart</span></button>
+        <button id="dpadToggle" type="button" aria-label="Show or hide the direction pad" aria-pressed="false">✥<span>D-pad</span></button>
+        <button id="sound" type="button" aria-label="Toggle sound">♪<span>Sound</span></button>
+      </div>
+    </footer>
+  </div>
+
+  <div id="menu" class="overlay" hidden>
+    <div class="panel">
+      <h2>Levels</h2>
+      <div id="levelGrid"></div>
+      <button id="menuClose" type="button" class="primary">Close</button>
+    </div>
+  </div>
+
+  <div id="end" class="overlay" hidden>
+    <div class="panel">
+      <h2>You made it!</h2>
+      <p id="endGold"></p>
+      <button id="again" type="button" class="primary">Play again</button>
+    </div>
+  </div>
+
+  <div id="rotate" role="alert">
+    <div>
+      <div class="phone" aria-hidden="true">📱</div>
+      <p>Please turn your phone upright</p>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+  <script>
+    // Offline support / installable app. Harmless if it fails.
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    }
+  </script>
+</body>
+</html>

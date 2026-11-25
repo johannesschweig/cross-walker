@@ -1,0 +1,5 @@
+# Source files that don't need to be served
+tools/
+assets/*.afdesign
+assets/sounds/music.mp3
+README.md
