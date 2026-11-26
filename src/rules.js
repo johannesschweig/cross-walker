@@ -1,6 +1,6 @@
 // The rules of one step: what can be walked on, what a pushed crate does, what kills you.
 // `tools/check-levels.js` mirrors these rules in a solver, so keep the two in sync.
-import { DIRS, MOVE_TIME, BURN_TIME, UNDO_LIMIT } from './config.js';
+import { DIRS, MOVE_TIME, BURN_TIME, CRUMBLE_TIME, UNDO_LIMIT } from './config.js';
 import { game, player, tileAt, crateAt } from './state.js';
 import { sfx } from './audio.js';
 import { clearInput } from './input.js';
@@ -9,7 +9,8 @@ import { snapshot } from './undo.js';
 
 const crateCanEnter = (gx, gy) => {
   const ch = tileAt(gx, gy);
-  // floor, gold, open water or fire (the crate burns up): never bricks, the door, or a bridge
+  // floor, gold, open water or fire (the crate burns up): never bricks, the door, a bridge or
+  // cracked floor ('x' / 'X')
   return (ch === '.' || ch === 'g' || ch === '~' || ch === 'F') && !crateAt(gx, gy);
 };
 
@@ -31,6 +32,11 @@ export function startStep(name, carry) {
   if (game.undo.length > UNDO_LIMIT) game.undo.shift();
   game.moves++;
   updateHud();
+  if (tileAt(player.gx, player.gy) === 'x') {      // leaving cracked floor: it breaks further
+    game.grid[player.gy][player.gx] = 'X';
+    game.effects.push({ type: 'crumble', gx: player.gx, gy: player.gy, t: 0, dur: CRUMBLE_TIME });
+    sfx.crack();
+  }
   player.fromX = player.gx; player.fromY = player.gy;
   player.gx = nx; player.gy = ny;
   player.pushed = crate || null;
@@ -40,11 +46,12 @@ export function startStep(name, carry) {
   return true;
 }
 
-function die() {
+function die(cause) {
   game.mode = 'dying';
   game.modeTime = 0;
+  game.deathCause = cause;
   clearInput();
-  sfx.fire();
+  if (cause === 'collapse') sfx.collapse(); else sfx.fire();
   if (navigator.vibrate) navigator.vibrate(120);
 }
 
@@ -68,7 +75,8 @@ export function finishStep() {
   }
 
   const ch = tileAt(player.gx, player.gy);
-  if (ch === 'F') { die(); return; }
+  if (ch === 'F') { die('fire'); return; }
+  if (ch === 'X') { die('collapse'); return; }     // broken floor gives way under you
   if (ch === 'g') {
     game.grid[player.gy][player.gx] = '.';
     game.gold++;

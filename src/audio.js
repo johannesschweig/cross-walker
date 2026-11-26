@@ -83,6 +83,8 @@ export const sfx = {
   win: () => blip([523, 659, 784, 1047], 0.4, 0.05),
   undo: () => blip([300, 220], 0.06, 0.04),
   burn: () => blip([700, 420, 640, 260, 480, 180], 0.45, 0.05),
+  crack: () => blip([220, 150, 190, 110], 0.12, 0.05),
+  collapse: () => blip([420, 300, 210, 130, 80], 0.5, 0.06),
   fire: () => { if (muted) return; fireSound.currentTime = 0; fireSound.play().catch(() => {}); },
 };
 

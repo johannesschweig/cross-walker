@@ -80,6 +80,48 @@ export function draw(tilesheet, spritesheet) {
     }
   };
 
+  // Cracked floor ('x') and broken floor ('X'), drawn on top of a floor tile on an 8x8 grid of
+  // chunky pixels. Cracked = one thin dark crack; broken = a wider web of cracks with dark gaps,
+  // so it reads at a glance as "won't hold another visit". Mirrored per tile so they don't all match.
+  const CRACK = [[0, 3], [1, 3], [2, 3], [2, 4], [3, 4], [4, 4], [4, 5], [5, 5], [6, 5], [6, 6], [7, 6],
+    [4, 3], [5, 3], [5, 2], [6, 2], [6, 1]];
+  const BREAK = [[2, 2], [2, 1], [3, 1], [3, 0], [3, 5], [3, 6], [2, 6], [2, 7], [6, 4], [7, 4], [1, 4], [1, 5]];
+  const GAPS = [[2, 3], [2, 4], [3, 4], [4, 4], [4, 5], [5, 5], [3, 5]];
+  const gridCells = (list, x0, y0, flip, color) => {
+    const u = T / 8;
+    ctx.fillStyle = color;
+    for (const [c, r] of list) {
+      const cx = flip ? 7 - c : c;
+      const xa = Math.round(x0 + cx * u), ya = Math.round(y0 + r * u);
+      ctx.fillRect(xa, ya, Math.round(x0 + (cx + 1) * u) - xa, Math.round(y0 + (r + 1) * u) - ya);
+    }
+  };
+  const crackFx = (tx, ty, broken) => {
+    const x0 = px(tx), y0 = py(ty), flip = hash(tx, ty, 9) > 0.5;
+    if (broken) {
+      ctx.fillStyle = 'rgba(0,0,0,0.14)';
+      ctx.fillRect(x0, y0, T, T);
+    }
+    gridCells(CRACK, x0, y0, flip, 'rgba(62,54,54,0.9)');
+    if (broken) {
+      gridCells(BREAK, x0, y0, flip, 'rgba(62,54,54,0.9)');
+      gridCells(GAPS, x0, y0, flip, '#1d1714');
+    }
+  };
+
+  // Floor tile that just broke further: a few chunks fall away as dust.
+  const crumbleFx = (e) => {
+    const k = e.t / e.dur;
+    const x0 = px(e.gx), y0 = py(e.gy);
+    const sz = Math.max(2, Math.round(T * 0.09));
+    for (let i = 0; i < 7; i++) {
+      ctx.fillStyle = `rgba(${i % 2 ? '120,112,108' : '70,62,60'},${Math.max(0, 1 - k)})`;
+      ctx.fillRect(
+        Math.round(x0 + (0.15 + 0.7 * hash(i, 11)) * T),
+        Math.round(y0 + (0.2 + 0.5 * hash(i, 12)) * T + k * k * T * 0.3), sz, sz);
+    }
+  };
+
   // Fire: a soft glow, a flame that breathes (smooth, bottom-anchored) and two rising embers.
   const fireFx = (tx, ty) => {
     const x0 = px(tx), y0 = py(ty), ph = hash(tx, ty) * 6.28;
@@ -143,6 +185,7 @@ export function draw(tilesheet, spritesheet) {
         cell('floor', tx, ty);
         if (ch === 'g') cell('gold', tx, ty);
         else if (ch === 'D') cell('door', tx, ty);
+        else if (ch === 'x' || ch === 'X') crackFx(tx, ty, ch === 'X');
       }
     }
   }
@@ -163,7 +206,10 @@ export function draw(tilesheet, spritesheet) {
     }
   }
 
-  for (const e of game.effects) if (e.type === 'burn') burnFx(e);
+  for (const e of game.effects) {
+    if (e.type === 'burn') burnFx(e);
+    else if (e.type === 'crumble') crumbleFx(e);
+  }
 
   const t = player.moving ? Math.min(1, player.t) : 1;
   for (const c of game.crates) {
@@ -177,10 +223,16 @@ export function draw(tilesheet, spritesheet) {
   const frame = player.moving ? 1 + (player.steps % (FRAMES - 1)) : 0;
   if (game.mode === 'dying') {
     const k = game.modeTime / DEATH_TIME;
+    const collapse = game.deathCause === 'collapse';
+    if (collapse) {                         // the floor gives way: a dark hole opens under the player
+      const s = Math.round(T * (0.35 + 0.65 * Math.min(1, k * 2.5)));
+      ctx.fillStyle = '#120d0a';
+      ctx.fillRect(px(player.gx) + Math.round((T - s) / 2), py(player.gy) + Math.round((T - s) / 2), s, s);
+    }
     ctx.save();
     ctx.translate(sx + T / 2, sy + T / 2);
-    ctx.rotate(k * 10);
-    ctx.scale(1 - k * 0.6, 1 - k * 0.6);
+    if (!collapse) ctx.rotate(k * 10);      // burning: spin; falling: just shrink into the hole
+    ctx.scale(1 - k * (collapse ? 0.9 : 0.6), 1 - k * (collapse ? 0.9 : 0.6));
     ctx.globalAlpha = 1 - k;
     ctx.drawImage(spritesheet, 0, 0, SRC, SRC, -T / 2, -T / 2, T, T);
     ctx.restore();
@@ -207,7 +259,7 @@ export function draw(tilesheet, spritesheet) {
     ctx.drawImage(spritesheet, frame * SRC, 0, SRC, SRC, sx, sy, T, T);
   }
 
-  if (game.mode === 'dying') {
+  if (game.mode === 'dying' && game.deathCause !== 'collapse') {
     ctx.fillStyle = `rgba(255,60,0,${0.35 * (1 - game.modeTime / DEATH_TIME)})`;
     ctx.fillRect(0, 0, V, V);
   }

@@ -10,6 +10,7 @@ export const SWIPE_DIST = 16;        // css px a finger has to travel before it 
 export const UNDO_LIMIT = 400;
 export const EXIT_TIME = 0.65;       // s the player takes to walk into the door
 export const BURN_TIME = 0.8;        // s a crate takes to burn up
+export const CRUMBLE_TIME = 0.45;    // s the dust of a cracked floor tile breaking further lasts
 export const THREE_STAR_SLACK = 1.25; // 3 stars: all gold within par * this many steps
 
 // Position of each tile in the tile sheet: [column, row]

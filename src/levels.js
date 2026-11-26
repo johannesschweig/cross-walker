@@ -2,7 +2,9 @@
 // #  brick (solid)     .  floor            S  start
 // ~  water (solid)     g  gold             D  door (level goal)
 // F  fire (deadly)     c  crate (pushable)
-// Internally a filled water tile becomes 'w' (water with a floating crate; walkable).
+// x  cracked floor: holds one visit. Step off it and it breaks; stepping on it again kills you.
+// Internally a filled water tile becomes 'w' (water with a floating crate; walkable) and a
+// cracked tile that was left becomes 'X' (broken).
 // `par` = fewest steps that collect all gold and reach the door.
 // `node tools/check-levels.js` verifies every level (solvable, all gold collectable, par).
 export const LEVELS = [
@@ -187,6 +189,20 @@ export const LEVELS = [
       "#.cF~.~~~.F#",
       "#..g~....gF#",
       "############",
+    ],
+  },
+  {
+    name: "Loose Ground",
+    hint: "Cracked floor breaks once you step off it. There is no way back.",
+    par: 26,
+    rows: [
+      "###########",
+      "#S.xg.#..g#",
+      "#.###.x...#",
+      "#D###.#x#x#",
+      "#.###.~.c.#",
+      "#..xg.#..g#",
+      "###########",
     ],
   },
 ];

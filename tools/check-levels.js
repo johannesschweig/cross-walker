@@ -8,7 +8,9 @@
  *   node tools/check-levels.js --write  also fix wrong `par` values in src/levels.js
  *
  * Rules mirrored from src/rules.js: fire is never stepped on; a crate pushed into water becomes a
- * bridge (walkable, crates can't enter it); a crate pushed into fire burns up (the fire stays).
+ * bridge (walkable, crates can't enter it); a crate pushed into fire burns up (the fire stays);
+ * cracked floor (x) can be stepped on once: when you step off it, it breaks (X) and stepping on it
+ * again kills you, just like fire. Crates can't be pushed onto cracked floor.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -35,12 +37,13 @@ function solve(rows) {
   const full = (1 << golds.size) - 1;
   const bit = (x, y) => (golds.has(`${x},${y}`) ? 1 << golds.get(`${x},${y}`) : 0);
   // `ch` = water cells filled with a crate (they are bridges now).
-  const key = (p, cr, ch, m) =>
-    `${p}|${cr.map((c) => c.join()).sort().join(';')}|${[...ch].sort().join(';')}|${m}`;
+  // `bk` = cracked floor cells that have been stepped on and left (they are broken now).
+  const key = (p, cr, ch, bk, m) =>
+    `${p}|${cr.map((c) => c.join()).sort().join(';')}|${[...ch].sort().join(';')}|${[...bk].sort().join(';')}|${m}`;
 
-  const first = { p: start, cr: crates, ch: new Set(), m: bit(...start), push: 0, d: 0 };
+  const first = { p: start, cr: crates, ch: new Set(), bk: new Set(), m: bit(...start), push: 0, d: 0 };
   const queue = [first];
-  const seen = new Set([key(first.p, first.cr, first.ch, first.m)]);
+  const seen = new Set([key(first.p, first.cr, first.ch, first.bk, first.m)]);
   let shortest = null, par = null, bestGold = 0;
   for (let i = 0; i < queue.length; i++) {
     const st = queue[i];
@@ -56,7 +59,10 @@ function solve(rows) {
       const t = g[ny][nx];
       if (t === '#') continue;
       if (t === 'F' || (t === '~' && !st.ch.has(`${nx},${ny}`))) continue;
+      if (t === 'x' && st.bk.has(`${nx},${ny}`)) continue;            // broken floor: deadly, like fire
       let cr = st.cr, ch = st.ch, push = 0;
+      // leaving cracked floor breaks it (the start tile is never cracked, so this is a first visit)
+      const bk = g[py][px] === 'x' ? new Set(st.bk).add(`${px},${py}`) : st.bk;
       const ci = cr.findIndex((c) => c[0] === nx && c[1] === ny);
       if (ci >= 0) {
         const tx = nx + dx, ty = ny + dy;
@@ -73,10 +79,10 @@ function solve(rows) {
         push = 1;
       }
       const m = st.m | bit(nx, ny);
-      const k = key([nx, ny], cr, ch, m);
+      const k = key([nx, ny], cr, ch, bk, m);
       if (seen.has(k)) continue;
       seen.add(k);
-      queue.push({ p: [nx, ny], cr, ch, m, push: st.push + push, d: st.d + 1 });
+      queue.push({ p: [nx, ny], cr, ch, bk, m, push: st.push + push, d: st.d + 1 });
     }
   }
   return shortest && { moves: shortest.d, pushes: shortest.push, gold: golds.size, bestGold, par };
@@ -88,6 +94,8 @@ LEVELS.forEach((lv, i) => {
   const rows = lv.rows;
   const problems = [];
   if (!rows.every((r) => r.length === rows[0].length)) problems.push('rows have different lengths');
+  const unknown = [...new Set(rows.join('').replace(/[#.SDgF~cx]/g, ''))];
+  if (unknown.length) problems.push(`unknown tiles: ${unknown.join(' ')}`);
   if (rows.join('').split('S').length !== 2) problems.push('needs exactly one S');
   if (rows.join('').split('D').length !== 2) problems.push('needs exactly one D');
   if (!rows[0].split('').every((c) => c === '#') || !rows[rows.length - 1].split('').every((c) => c === '#') ||

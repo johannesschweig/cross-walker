@@ -15,6 +15,7 @@ export const game = {
   levelGoldTotal: 0,
   mode: 'play',      // 'play' | 'dying' | 'exiting' | 'result' | 'end'
   modeTime: 0,
+  deathCause: null,  // while dying: 'fire' | 'collapse'
   fade: 0,
   time: 0,           // seconds since start, drives idle animations
   moves: 0,
