@@ -1,7 +1,7 @@
 {
   "name": "Cross Walker",
   "short_name": "Cross Walker",
-  "description": "A tiny puzzle game: collect gold, dodge fire, bridge rivers with crates.",
+  "description": "Ein kleines Rätselspiel: Sammle Gold, weiche dem Feuer aus, überbrücke Flüsse mit Kisten.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

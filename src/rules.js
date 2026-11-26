@@ -1,6 +1,6 @@
 // The rules of one step: what can be walked on, what a pushed crate does, what kills you.
 // `tools/check-levels.js` mirrors these rules in a solver, so keep the two in sync.
-import { DIRS, MOVE_TIME, BURN_TIME, CRUMBLE_TIME, SPLASH_TIME, STEAM_TIME, UNDO_LIMIT } from './config.js';
+import { DIRS, MOVE_TIME, BURN_TIME, CRUMBLE_TIME, SPLASH_TIME, STEAM_TIME, RUBBLE_TIME, UNDO_LIMIT } from './config.js';
 import { game, player, tileAt, crateAt } from './state.js';
 import { sfx } from './audio.js';
 import { clearInput } from './input.js';
@@ -10,7 +10,7 @@ import { snapshot } from './undo.js';
 const crateCanEnter = (gx, gy) => {
   const ch = tileAt(gx, gy);
   // floor, gold, open water or fire (the crate burns up): never bricks, the door, a bridge,
-  // cracked floor ('x' / 'X') or a bucket ('b')
+  // cracked floor ('x' / 'X'), a cracked wall ('W') or a tool lying there ('b' / 'p')
   return (ch === '.' || ch === 'g' || ch === '~' || ch === 'F') && !crateAt(gx, gy);
 };
 
@@ -37,6 +37,15 @@ function useBucket(tx, ty) {
   }
 }
 
+// Using the pickaxe: it smashes the cracked wall and breaks doing so, so the hands are free again.
+// The player stays where they are, but it takes a step.
+function usePickaxe(tx, ty) {
+  player.pickaxe = false;
+  game.grid[ty][tx] = '.';
+  game.effects.push({ type: 'rubble', gx: tx, gy: ty, t: 0, dur: RUBBLE_TIME });
+  sfx.dig();
+}
+
 /** Starts a step in direction `name`. Returns true if the step started. */
 export function startStep(name, carry) {
   const d = DIRS[name];
@@ -46,8 +55,11 @@ export function startStep(name, carry) {
 
   const bucketUse = (ch === '~' && player.bucket === 'empty') || (ch === 'F' && player.bucket === 'full');
   if (ch === '~' && !bucketUse) return false;
+  const pickUse = ch === 'W' && player.pickaxe;
+  if (ch === 'W' && !pickUse) return false;       // without a pickaxe a cracked wall is just a wall
 
-  const crate = bucketUse ? null : crateAt(nx, ny);
+  const bump = bucketUse || pickUse;
+  const crate = bump ? null : crateAt(nx, ny);
   if (crate) {
     const tx = nx + d.x, ty = ny + d.y;
     if (!crateCanEnter(tx, ty)) return false;
@@ -55,8 +67,8 @@ export function startStep(name, carry) {
     sfx.push();
   }
   commitStep();
-  if (bucketUse) {
-    useBucket(nx, ny);
+  if (bump) {
+    if (bucketUse) useBucket(nx, ny); else usePickaxe(nx, ny);
     player.fromX = player.gx; player.fromY = player.gy;    // no movement, but the step takes its time
     player.pushed = null;
     player.moving = true;
@@ -113,9 +125,12 @@ export function finishStep() {
     game.gold++;
     sfx.gold();
     updateHud();
-  } else if (ch === 'b' && !player.bucket) {      // pick up a bucket (one at a time; a second is left)
-    game.grid[player.gy][player.gx] = '.';
-    player.bucket = 'empty';
+  } else if ((ch === 'b' && !player.bucket) || (ch === 'p' && !player.pickaxe)) {
+    // A tool on the floor: pick it up. One tool at a time, so a different tool in hand is swapped
+    // for it and stays on this tile (a bucket drops empty). The same kind of tool is left lying.
+    game.grid[player.gy][player.gx] = player.bucket ? 'b' : player.pickaxe ? 'p' : '.';
+    player.bucket = ch === 'b' ? 'empty' : null;
+    player.pickaxe = ch === 'p';
     sfx.pickup();
   } else if (ch === 'D') {
     game.mode = 'exiting';                 // walk into the door, then show the result

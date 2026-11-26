@@ -5,15 +5,17 @@
  * object to paste, then run `npm run check -- --write` to be sure par is right).
  *
  *   node tools/generate-levels.js [--seed N] [--tries N] [--top N] [--par MIN-MAX]
- *                                 [--mechanics river,fire,crack] [--mix 2] [--size WxH] [--climb N]
+ *                                 [--mechanics river,fire,crack,dig] [--mix 2] [--size WxH] [--climb N]
  *                                 [--min-need 0.7] [--max-states N] [--snippet]
  *
  * How it works
  *   1. Skeleton: each level uses only `--mix` families of mechanics (default 2 of water, fire,
- *      crack). The level is cut into zones by "chokes" (full columns), one gadget per family:
+ *      crack, dig). The level is cut into zones by "chokes" (full columns), one gadget per family:
  *        river  a column of water, with a crate waiting before it (bridge); pond = a one-tile river
  *        fire   a wall with one fire tile as the opening, plus a bucket and a pool of water earlier
  *        crack  a wall whose only opening is cracked floor (one-way: you can't come back)
+ *        dig    a wall whose only opening is a cracked wall (W), plus a pickaxe earlier; the
+ *               pickaxe breaks after one wall; one tool at a time, a different tool is swapped in
  *      The gadgets are tied together (fire in a crate's lane, cracked floor next to a crate, a
  *      bucket that has to be refilled between fires), then bricks, stray fire and guarded gold are
  *      added. Half the levels are turned 90 degrees.
@@ -32,7 +34,7 @@ import { solve } from './solver.js';
 
 // ---- options ---------------------------------------------------------------------------------
 const opt = { seed: Math.floor(Math.random() * 1e6), tries: 1500, top: 5, par: '14-40', climb: 25, pool: 24,
-  mechanics: 'river,fire,crack', mix: 2, size: '', minNeed: 0.7, maxStates: 60000, snippet: false, help: false };
+  mechanics: 'river,fire,crack,dig', mix: 2, size: '', minNeed: 0.7, maxStates: 60000, snippet: false, help: false };
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i++) {
   if (!argv[i].startsWith('--')) continue;
@@ -47,12 +49,12 @@ if (opt.help) {
 }
 function fsHeader() {
   return 'Usage: node tools/generate-levels.js [--seed N] [--tries N] [--top N] [--par MIN-MAX]\n' +
-    '       [--mechanics river,fire,crack] [--mix 2] [--size WxH] [--climb N] [--pool N] [--min-need 0.7]\n' +
+    '       [--mechanics river,fire,crack,dig] [--mix 2] [--size WxH] [--climb N] [--pool N] [--min-need 0.7]\n' +
     '       [--max-states N] [--snippet]\nSee the comment at the top of the file for what it does.';
 }
 const [parMin, parMax] = opt.par.split('-').map(Number);
 const mechanics = opt.mechanics.split(',').filter(Boolean);
-for (const m of mechanics) if (!['river', 'fire', 'crack'].includes(m)) { console.error(`Unknown mechanic ${m}`); process.exit(2); }
+for (const m of mechanics) if (!['river', 'fire', 'crack', 'dig'].includes(m)) { console.error(`Unknown mechanic ${m}`); process.exit(2); }
 const size = opt.size ? opt.size.split('x').map(Number) : null;
 
 // ---- seeded random numbers (same seed, same levels) -----------------------------------------
@@ -78,7 +80,7 @@ const pick = (arr) => (arr.length ? arr[Math.floor(rand() * arr.length)] : undef
 //   fire in lane  a fire between crate and river forces the crate around it, or the fire out first
 //   crack patch   cracked floor next to a crate, which can't be pushed onto it
 function generate() {
-  const fams = [...['water', 'fire', 'crack'].filter((f) => mechanics.includes({ water: 'river', fire: 'fire', crack: 'crack' }[f]))]
+  const fams = [...['water', 'fire', 'crack', 'dig'].filter((f) => mechanics.includes({ water: 'river', fire: 'fire', crack: 'crack', dig: 'dig' }[f]))]
     .sort(() => rand() - 0.5).slice(0, opt.mix);
   const W = size ? size[0] : fams.length >= 3 ? 11 : int(8, 10), H = size ? size[1] : int(6, 8);
   const g = Array.from({ length: H }, (_, y) =>
@@ -99,7 +101,7 @@ function generate() {
   zones.push([cols[cols.length - 1] + 1, W - 2]);
 
   // one choke per family first (so every family shows up), then random extras; random order
-  const kind = { water: () => pick(['river', 'pond']), fire: () => 'fire', crack: () => 'crack' };
+  const kind = { water: () => pick(['river', 'pond']), fire: () => 'fire', crack: () => 'crack', dig: () => 'dig' };
   const types = fams.map((f) => kind[f]());
   while (types.length < cols.length) types.push(kind[pick(fams)]());
   types.sort(() => rand() - 0.5);
@@ -144,6 +146,9 @@ function generate() {
       put(int(0, i), '~');
     } else if (type === 'crack') {
       g[row][c] = 'x';
+    } else if (type === 'dig') {
+      g[row][c] = 'W';
+      put(int(0, i), 'p');                     // the pickaxe is before its wall
     }
   });
   if (rand() < 0.2) put(int(0, zones.length - 1), 'c', (x, y) => y >= 2 && y <= H - 3);   // spare crate
@@ -190,13 +195,13 @@ function elements(rows) {
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const ch = rows[y][x];
-      if (!'cbF~x'.includes(ch) || seen.has(`${x},${y}`)) continue;
+      if (!'cbpFW~x'.includes(ch) || seen.has(`${x},${y}`)) continue;
       const cells = [], todo = [[x, y]];
       seen.add(`${x},${y}`);
       while (todo.length) {
         const [cx, cy] = todo.pop();
         cells.push([cx, cy]);
-        if (ch === 'c' || ch === 'b') continue;
+        if (ch === 'c' || ch === 'b' || ch === 'p') continue;
         for (const [ax, ay] of [[cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]]) {
           if (rows[ay]?.[ax] === ch && !seen.has(`${ax},${ay}`)) { seen.add(`${ax},${ay}`); todo.push([ax, ay]); }
         }
@@ -246,14 +251,14 @@ function mutate(rows) {
     for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) if (ok(g[y][x])) out.push([x, y]);
     return out;
   };
-  const op = int(0, 4);
+  const op = int(0, 5);
   if (op === 0 || op === 4) {                    // wall <-> floor, or fire <-> floor
     const [a, b] = op === 0 ? ['.', '#'] : ['.', 'F'];
     const c = pick(cells((t) => t === a || t === b));
     if (!c) return null;
     g[c[1]][c[0]] = g[c[1]][c[0]] === a ? b : a;
   } else {                                       // move a gold, crate or bucket
-    const ch = 'gcb'[op - 1];
+    const ch = 'gcbp'[op === 5 ? 3 : op - 1];   // 1 gold, 2 crate, 3 bucket, 5 pickaxe
     const from = pick(cells((t) => t === ch)), to = pick(cells((t) => t === '.'));
     if (!from || !to) return null;
     g[from[1]][from[0]] = '.';
@@ -304,7 +309,7 @@ kept.sort((a, b) => b.m.score - a.m.score);
 function signature(rows) {
   const t = rows.join('');
   const n = (c) => t.split(c).length - 1;
-  return `${[...'cbFx'].filter((k) => n(k)).join('')}${n('~') ? '~' : ''} F${Math.min(n('F'), 3)} c${Math.min(n('c'), 2)}`;
+  return `${[...'cbpFWx'].filter((k) => n(k)).join('')}${n('~') ? '~' : ''} F${Math.min(n('F'), 3)} c${Math.min(n('c'), 2)}`;
 }
 const seenSig = new Map();
 for (const l of LEVELS) seenSig.set(signature(l.rows), (seenSig.get(signature(l.rows)) || 0) + 1);

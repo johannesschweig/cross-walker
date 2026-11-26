@@ -28,7 +28,8 @@ export function loadLevel(index, { fresh = true } = {}) {
     }
   }
   player.t = 1; player.moving = false; player.pushed = null; player.steps = 0;
-  player.bucket = null;               // a bucket is only carried within one level
+  player.bucket = null;               // tools are only carried within one level
+  player.pickaxe = false;
   clearInput();                       // make the player press a key again after (re)starting
   game.undo = [];
   game.moves = 0;

@@ -9,6 +9,11 @@
  * Bucket (b): picked up by walking onto it (one at a time). Moving into open water with an empty
  * bucket fills it, moving into fire with a full one puts the fire out; either takes a step and the
  * player stays put. Crates can't be pushed onto an unpicked bucket tile.
+ * Pickaxe (p): picked up by walking onto it. Moving into a cracked wall (W) with it smashes the wall and
+ * breaks the pickaxe; takes a step, the player stays put. Without a pickaxe W is a wall.
+ * One tool at a time: walking onto a tool of the other kind swaps them (the one carried stays on that
+ * tile; a bucket drops empty); walking onto the same kind leaves it lying. Crates can't enter W or a
+ * tile with a tool on it.
  *
  *   solve(rows, { maxStates, traps })
  *     rows       level rows as in src/levels.js (needs a brick border)
@@ -36,17 +41,22 @@ export function solve(rows, { maxStates = Infinity, traps = false } = {}) {
       else if (c === 'g') golds.set(`${x},${y}`, golds.size);
     }
   }
+  const toolTiles = [];                        // b and p tiles; their content changes (picked up, swapped)
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (g[y][x] === 'b' || g[y][x] === 'p') toolTiles.push([x, y]);
+  const toolIndex = new Map(toolTiles.map(([x, y], i) => [`${x},${y}`, i]));
   const full = (1 << golds.size) - 1;
   const bit = (x, y) => (golds.has(`${x},${y}`) ? 1 << golds.get(`${x},${y}`) : 0);
   // State of a search node:
   //   `ch` = water cells filled with a crate (they are bridges now)
   //   `bk` = cracked floor cells that have been stepped on and left (they are broken now)
-  //   `bucket` = 0 none, 1 empty, 2 full; `ex` = fires put out; `pk` = bucket tiles picked up
+  //   `bucket` = 0 none, 1 empty, 2 full; `ex` = fires put out; `pick` = 1 while carrying the pickaxe;
+  //   `wb` = cracked walls smashed; `tl` = what lies on each tool tile now (one char per tile of the
+  //   level that started as b or p, in reading order): b, p or . (nothing)
   const keyOf = (s) =>
     `${s.p}|${s.cr.map((c) => c.join()).sort().join(';')}|${[...s.ch].sort().join(';')}|${[...s.bk].sort().join(';')}` +
-    `|${s.bucket}|${[...s.ex].sort().join(';')}|${[...s.pk].sort().join(';')}|${s.m}`;
+    `|${s.bucket}|${[...s.ex].sort().join(';')}|${s.pick}|${[...s.wb].sort().join(';')}|${s.tl}|${s.m}`;
 
-  const first = { p: start, cr: crates, ch: new Set(), bk: new Set(), bucket: 0, ex: new Set(), pk: new Set(),
+  const first = { p: start, cr: crates, ch: new Set(), bk: new Set(), bucket: 0, ex: new Set(), pick: 0, wb: new Set(), tl: toolTiles.map(([x, y]) => g[y][x]).join(''),
     m: bit(...start), push: 0, d: 0 };
   const queue = [first];
   const index = new Map([[keyOf(first), 0]]);
@@ -63,6 +73,13 @@ export function solve(rows, { maxStates = Infinity, traps = false } = {}) {
     }
     if (edges) edges.push(cur, j);
   };
+  // what is on a tile now: fires put out, walls smashed, tools (picked up or swapped)
+  const eff = (t, at, s) => {
+    if (t === 'F') return s.ex.has(at) ? '.' : 'F';
+    if (t === 'W') return s.wb.has(at) ? '.' : 'W';
+    if (t === 'b' || t === 'p') return s.tl[toolIndex.get(at)];
+    return t;
+  };
   const atDoor = (st) => st.p[0] === door[0] && st.p[1] === door[1];
   let shortest = null, parState = null, par = null, bestGold = 0;
   for (let i = 0; i < queue.length; i++) {
@@ -78,8 +95,12 @@ export function solve(rows, { maxStates = Infinity, traps = false } = {}) {
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const nx = px + dx, ny = py + dy, at = `${nx},${ny}`;
       let t = g[ny][nx];
-      if ((t === 'F' && st.ex.has(at)) || (t === 'b' && st.pk.has(at))) t = '.';   // put out / picked up
+      t = eff(t, at, st);                            // put out / picked up / smashed / pickaxe dropped
       if (t === '#') continue;
+      if (t === 'W') {                               // cracked wall: the pickaxe smashes it, else a wall
+        if (st.pick) add({ ...st, pick: 0, wb: new Set(st.wb).add(at), d: st.d + 1 });
+        continue;
+      }
       if (t === '~' && !st.ch.has(at)) {            // open water: fills an empty bucket, else a wall
         if (st.bucket === 1) add({ ...st, bucket: 2, d: st.d + 1 });
         continue;
@@ -96,7 +117,7 @@ export function solve(rows, { maxStates = Infinity, traps = false } = {}) {
       if (ci >= 0) {
         const tx = nx + dx, ty = ny + dy, tk = `${tx},${ty}`;
         let u = g[ty][tx];
-        if ((u === 'F' && st.ex.has(tk)) || (u === 'b' && st.pk.has(tk))) u = '.';
+        u = eff(u, tk, st);
         if (cr.some((c) => c[0] === tx && c[1] === ty)) continue;
         if (u === '~' && !ch.has(tk)) {                                 // fills the water
           ch = new Set(ch).add(tk);
@@ -108,9 +129,14 @@ export function solve(rows, { maxStates = Infinity, traps = false } = {}) {
         } else continue;
         push = 1;
       }
-      let bucket = st.bucket, pk = st.pk;
-      if (t === 'b' && bucket === 0) { bucket = 1; pk = new Set(pk).add(at); }   // pick up (one at a time)
-      add({ p: [nx, ny], cr, ch, bk, bucket, ex: st.ex, pk, m: st.m | bit(nx, ny), push: st.push + push, d: st.d + 1 });
+      let bucket = st.bucket, pick = st.pick, tl = st.tl;
+      if ((t === 'b' && !bucket) || (t === 'p' && !pick)) {   // a tool: pick it up, swapping a different one in hand
+        const i = toolIndex.get(at);
+        tl = tl.slice(0, i) + (bucket ? 'b' : pick ? 'p' : '.') + tl.slice(i + 1);
+        bucket = t === 'b' ? 1 : 0;
+        pick = t === 'p' ? 1 : 0;
+      }
+      add({ p: [nx, ny], cr, ch, bk, bucket, ex: st.ex, pick, wb: st.wb, tl, m: st.m | bit(nx, ny), push: st.push + push, d: st.d + 1 });
     }
   }
   if (truncated) return { truncated: true, states: queue.length };
@@ -121,6 +147,7 @@ export function solve(rows, { maxStates = Infinity, traps = false } = {}) {
     // what a par solution has to use: fires put out (each needs its own bucket fill), cracked tiles crossed
     result.parDouse = parState.ex.size;
     result.parCrack = parState.bk.size;
+    result.parDig = parState.wb.size;
   }
   if (traps) {
     // Number of different shortest solutions (paths through the state graph that reach the door with

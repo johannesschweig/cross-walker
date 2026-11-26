@@ -4,14 +4,18 @@
 // F  fire (deadly)     c  crate (pushable)
 // x  cracked floor: holds one visit. Step off it and it breaks; stepping on it again kills you.
 // b  bucket: pick it up, walk into water to fill it, walk into fire to put the fire out (once per fill).
+// p  pickaxe: pick it up, walk into a cracked wall (W) to smash it. It breaks doing so. Only one tool
+//    (bucket or pickaxe) at a time: walking onto the other kind swaps them (the one you carried stays
+//    on that tile, a bucket drops empty). Walking onto the same kind leaves it lying.
+// W  cracked wall: a wall until it is smashed with the pickaxe, then floor.
 // Internally a filled water tile becomes 'w' (water with a floating crate; walkable) and a
 // cracked tile that was left becomes 'X' (broken).
 // `par` = fewest steps that collect all gold and reach the door.
 // `node tools/check-levels.js` verifies every level (solvable, all gold collectable, par).
 export const LEVELS = [
   {
-    name: "First Steps",
-    hint: "Collect the gold and reach the door.",
+    name: "Erste Schritte",
+    hint: "Sammle das Gold und erreiche die Tür.",
     par: 13,
     rows: [
       "########",
@@ -24,8 +28,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Warm Hands",
-    hint: "Fire burns. Touch it and the level starts over.",
+    name: "Warme Hände",
+    hint: "Feuer brennt. Berührst du es, beginnt das Level von vorn.",
     par: 16,
     rows: [
       "########",
@@ -39,8 +43,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Splash",
-    hint: "Push a crate into water to make a bridge.",
+    name: "Platsch",
+    hint: "Schiebe eine Kiste ins Wasser, um eine Brücke zu bauen.",
     par: 10,
     rows: [
       "#########",
@@ -51,8 +55,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Corner Pocket",
-    hint: "Crates only go straight. Plan your turns.",
+    name: "Ecktasche",
+    hint: "Kisten gehen nur geradeaus. Plane deine Wendungen.",
     par: 18,
     rows: [
       "########",
@@ -66,8 +70,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Burn It",
-    hint: "Fire eats crates. Use it to clear the way.",
+    name: "Ab ins Feuer",
+    hint: "Feuer frisst Kisten. Nutze es, um den Weg frei zu machen.",
     par: 20,
     rows: [
       "#########",
@@ -79,8 +83,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Too Many Crates",
-    hint: "You don't need them all. Fire can get rid of one.",
+    name: "Zu viele Kisten",
+    hint: "Du brauchst nicht alle. Feuer kann eine beseitigen.",
     par: 23,
     rows: [
       "##########",
@@ -93,8 +97,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Two Gates",
-    hint: "Only one gate leads to the door. The other hides gold.",
+    name: "Zwei Tore",
+    hint: "Nur ein Tor führt zur Tür. Das andere versteckt Gold.",
     par: 25,
     rows: [
       "##########",
@@ -107,8 +111,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Moat",
-    hint: "The door is an island. Where to build the bridge?",
+    name: "Burggraben",
+    hint: "Die Tür liegt auf einer Insel. Wo baust du die Brücke?",
     par: 24,
     rows: [
       "##########",
@@ -122,8 +126,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Two Rivers",
-    hint: "Each river needs its own crate.",
+    name: "Zwei Flüsse",
+    hint: "Jeder Fluss braucht seine eigene Kiste.",
     par: 26,
     rows: [
       "###########",
@@ -136,8 +140,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Crate Jam",
-    hint: "Three crates side by side. They can't all be useful.",
+    name: "Kistenstau",
+    hint: "Drei Kisten nebeneinander. Nicht alle können nützlich sein.",
     par: 31,
     rows: [
       "##########",
@@ -150,8 +154,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Island Hop",
-    hint: "Fire guards the shore.",
+    name: "Inselhüpfen",
+    hint: "Feuer bewacht das Ufer.",
     par: 28,
     rows: [
       "##########",
@@ -165,8 +169,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Long River",
-    hint: "Take your time. Think a few pushes ahead.",
+    name: "Langer Fluss",
+    hint: "Lass dir Zeit. Denk ein paar Schübe voraus.",
     par: 32,
     rows: [
       "###########",
@@ -179,8 +183,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Grand Tour",
-    hint: "A river, then an island. Two crates, two crossings.",
+    name: "Große Tour",
+    hint: "Ein Fluss, dann eine Insel. Zwei Kisten, zwei Überquerungen.",
     par: 46,
     rows: [
       "############",
@@ -193,8 +197,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Loose Ground",
-    hint: "Cracked floor breaks once you step off it. There is no way back.",
+    name: "Lockerer Boden",
+    hint: "Brüchiger Boden bricht, sobald du ihn verlässt. Es gibt kein Zurück.",
     par: 26,
     rows: [
       "###########",
@@ -207,8 +211,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Bucket Brigade",
-    hint: "Walk into water to fill the bucket, into fire to put it out.",
+    name: "Eimerkette",
+    hint: "Lauf ins Wasser, um den Eimer zu füllen, und ins Feuer, um es zu löschen.",
     par: 38,
     rows: [
       "###########",
@@ -221,8 +225,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Fire Drill",
-    hint: "Fill the bucket at the water, then walk into the fire.",
+    name: "Feuerübung",
+    hint: "Fülle den Eimer am Wasser und lauf dann ins Feuer.",
     par: 19,
     rows: [
       "##########",
@@ -234,8 +238,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Thin Ice",
-    hint: "Cracked floor breaks once you step off it. Crates cannot cross it.",
+    name: "Dünnes Eis",
+    hint: "Brüchiger Boden bricht, sobald du ihn verlässt. Kisten können ihn nicht überqueren.",
     par: 23,
     rows: [
       "##########",
@@ -249,8 +253,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Hot Foot",
-    hint: "One bucket puts out one fire. Refill at the water.",
+    name: "Heiße Sohlen",
+    hint: "Ein Eimer löscht ein Feuer. Fülle am Wasser nach.",
     par: 24,
     rows: [
       "##########",
@@ -263,8 +267,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Crumble and Burn",
-    hint: "Cracked floor is one-way. Fill the bucket before you cross.",
+    name: "Bröckeln und Brennen",
+    hint: "Brüchiger Boden ist eine Einbahnstraße. Fülle den Eimer, bevor du hinübergehst.",
     par: 27,
     rows: [
       "##########",
@@ -277,8 +281,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Lava Lane",
-    hint: "Crates burn in fire. Mind their lane.",
+    name: "Lavagasse",
+    hint: "Kisten verbrennen im Feuer. Achte auf ihre Bahn.",
     par: 28,
     rows: [
       "##########",
@@ -292,8 +296,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Last Crossing",
-    hint: "Bridge the river, then watch your step.",
+    name: "Letzte Überquerung",
+    hint: "Überbrücke den Fluss und pass dann auf, wo du hintrittst.",
     par: 29,
     rows: [
       "########",
@@ -309,8 +313,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Zigzag",
-    hint: "Refill the bucket between fires.",
+    name: "Zickzack",
+    hint: "Fülle den Eimer zwischen den Feuern nach.",
     par: 29,
     rows: [
       "#########",
@@ -323,8 +327,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Long Way Round",
-    hint: "Cracked floor only holds one visit.",
+    name: "Der lange Weg",
+    hint: "Brüchiger Boden hält nur einen Besuch aus.",
     par: 29,
     rows: [
       "########",
@@ -340,8 +344,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Riverside",
-    hint: "Bridge the river with the crate. Mind the fire.",
+    name: "Flussufer",
+    hint: "Überbrücke den Fluss mit der Kiste. Vorsicht vor dem Feuer.",
     par: 32,
     rows: [
       "##########",
@@ -355,8 +359,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Fire Line",
-    hint: "Four fires, one bucket. Plan your trips.",
+    name: "Feuerlinie",
+    hint: "Vier Feuer, ein Eimer. Plane deine Wege.",
     par: 34,
     rows: [
       "##########",
@@ -368,8 +372,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Pond Hopper",
-    hint: "Crates are for water. Fire needs the bucket.",
+    name: "Teichhüpfer",
+    hint: "Kisten sind für Wasser. Feuer braucht den Eimer.",
     par: 37,
     rows: [
       "#######",
@@ -385,8 +389,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Dry Corner",
-    hint: "The water is small, so make each fill count.",
+    name: "Trockene Ecke",
+    hint: "Das Wasser ist knapp, also zählt jede Füllung.",
     par: 38,
     rows: [
       "#########",
@@ -400,8 +404,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Burning Banks",
-    hint: "Two crates, a long river, and fire on the shore.",
+    name: "Brennende Ufer",
+    hint: "Zwei Kisten, ein langer Fluss und Feuer am Ufer.",
     par: 38,
     rows: [
       "##########",
@@ -414,8 +418,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Hot Water",
-    hint: "One crate, one bucket, three fires.",
+    name: "Heißes Wasser",
+    hint: "Eine Kiste, ein Eimer, drei Feuer.",
     par: 39,
     rows: [
       "#########",
@@ -427,8 +431,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Tinderbox",
-    hint: "Three fires and one bucket.",
+    name: "Zunderkiste",
+    hint: "Drei Feuer und ein Eimer.",
     par: 40,
     rows: [
       "##########",
@@ -442,8 +446,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Slow Burn",
-    hint: "Cracked floor sits between you and the gold.",
+    name: "Schwelbrand",
+    hint: "Brüchiger Boden liegt zwischen dir und dem Gold.",
     par: 41,
     rows: [
       "#######",
@@ -459,8 +463,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "The Gauntlet",
-    hint: "Plan your trips to the water.",
+    name: "Spießrutenlauf",
+    hint: "Plane deine Wege zum Wasser.",
     par: 44,
     rows: [
       "#########",
@@ -474,8 +478,8 @@ export const LEVELS = [
     ],
   },
   {
-    name: "Floodgate",
-    hint: "Push the crate into the river. Mind the fires.",
+    name: "Schleuse",
+    hint: "Schiebe die Kiste in den Fluss. Vorsicht vor den Feuern.",
     par: 45,
     rows: [
       "########",
@@ -488,6 +492,60 @@ export const LEVELS = [
       "#..#.#.#",
       "##D....#",
       "########",
+    ],
+  },
+  {
+    name: "Lose Steine",
+    hint: "Brüchige Wände geben einer Spitzhacke nach. Sie geht nach einer Wand kaputt.",
+    par: 15,
+    rows: [
+      "#########",
+      "#S.p#..g#",
+      "#..##.#.#",
+      "#...W.#D#",
+      "#########",
+    ],
+  },
+  {
+    name: "Durchbruch",
+    hint: "Zerschlage die Wand und schiebe dann die Kiste in den Fluss.",
+    par: 23,
+    rows: [
+      "##########",
+      "#.##g.~.D#",
+      "#S#.#.~#.#",
+      "#..#..~..#",
+      "#p.Wcg~#.#",
+      "#..#..~.##",
+      "##########",
+    ],
+  },
+  {
+    name: "Wähle deinen Weg",
+    hint: "Brüchiger Boden ist eine Einbahnstraße. Überlege, bevor du trittst.",
+    par: 18,
+    rows: [
+      "#########",
+      "##p#.##.#",
+      "#S.#gW.g#",
+      "#xxx..#D#",
+      "#.g#g##.#",
+      "#########",
+    ],
+  },
+  {
+    name: "Hacke oder Eimer",
+    hint: "Nur ein Werkzeug auf einmal. Ein neues ersetzt das alte.",
+    par: 36,
+    rows: [
+      "##########",
+      "#~.W.F..##",
+      "#.p#.#...#",
+      "#.b#.#gg.#",
+      "#..#F#..D#",
+      "#.##g#..g#",
+      "#S.#.#..##",
+      "##########",
     ],
   },
 ];

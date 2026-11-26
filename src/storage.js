@@ -1,7 +1,7 @@
 // Everything kept in localStorage. Each call is wrapped in try/catch because storage can be
 // unavailable (private windows, blocked site data); the game then simply doesn't remember.
 //   cw-progress  next level + gold at its start     cw-stars  best stars and steps per level
-//   cw-muted     sound off                          cw-dpad   on-screen d-pad shown
+//   cw-muted     sound off
 import { LEVELS } from './levels.js';
 
 // ---- Progress (remembered between visits) ----------------------------------------------------

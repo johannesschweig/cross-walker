@@ -7,6 +7,7 @@ export const player = {
   pushed: null,                 // crate being pushed during this step
   steps: 0,
   bucket: null,                 // carried bucket: null (none) | 'empty' | 'full'
+  pickaxe: false,               // carried pickaxe; it breaks on one wall. A tool is only carried one at a time: walking onto another kind swaps them
 };
 
 export const game = {

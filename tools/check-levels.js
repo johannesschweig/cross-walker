@@ -23,7 +23,7 @@ LEVELS.forEach((lv, i) => {
   const rows = lv.rows;
   const problems = [];
   if (!rows.every((r) => r.length === rows[0].length)) problems.push('rows have different lengths');
-  const unknown = [...new Set(rows.join('').replace(/[#.SDgF~cxb]/g, ''))];
+  const unknown = [...new Set(rows.join('').replace(/[#.SDgF~cxbWp]/g, ''))];
   if (unknown.length) problems.push(`unknown tiles: ${unknown.join(' ')}`);
   if (rows.join('').split('S').length !== 2) problems.push('needs exactly one S');
   if (rows.join('').split('D').length !== 2) problems.push('needs exactly one D');

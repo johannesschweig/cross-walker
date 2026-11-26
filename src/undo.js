@@ -10,6 +10,7 @@ export function snapshot() {
     crates: game.crates.map((c) => [c.gx, c.gy]),
     gx: player.gx, gy: player.gy,
     bucket: player.bucket,
+    pickaxe: player.pickaxe,
     gold: game.gold,
     moves: game.moves,
   };
@@ -24,6 +25,7 @@ export function undo() {
   player.gy = player.fromY = s.gy;
   player.t = 1; player.moving = false; player.pushed = null;
   player.bucket = s.bucket;
+  player.pickaxe = s.pickaxe;
   game.gold = s.gold;
   game.moves = s.moves;
   game.effects = [];

@@ -27,7 +27,7 @@ import { el, coarse } from './dom.js';
 import { initAudio, toggleMute } from './audio.js';
 import { initInput } from './input.js';
 import { initRender, loadSprites, draw } from './render.js';
-import { openMenu, closeMenu, initDpad, toggleDpad } from './ui.js';
+import { openMenu, closeMenu, initDpad } from './ui.js';
 import { undo } from './undo.js';
 import { startGame, update, loadLevel, restartLevel, retryLevel, nextLevel, playAgain, confirm } from './game.js';
 
@@ -45,7 +45,6 @@ initInput({ undo, restart: restartLevel, toggleMute, confirm });
 // Buttons and panels
 el.restart.addEventListener('click', restartLevel);
 el.sound.addEventListener('click', toggleMute);
-el.dpadToggle.addEventListener('click', toggleDpad);
 el.again.addEventListener('click', playAgain);
 el.resultNext.addEventListener('click', nextLevel);
 el.resultRetry.addEventListener('click', retryLevel);

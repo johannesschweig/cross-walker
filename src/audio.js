@@ -25,7 +25,7 @@ const musicErrors = [];
 const musicFail = (why) => {
   musicErrors.push(why);
   console.warn('Cross Walker music:', why);
-  el.sound.title = `Music problem: ${location.protocol} ${musicErrors.join(' → ')}`;
+  el.sound.title = `Musikproblem: ${location.protocol} ${musicErrors.join(' → ')}`;
 };
 
 // Some environments can't stream the mp3 through an <audio> element, e.g. servers without
@@ -86,6 +86,7 @@ export const sfx = {
   pickup: () => blip([660, 880], 0.08, 0.04),
   fill: () => blip([420, 600, 820], 0.12, 0.04),
   douse: () => blip([900, 520, 320, 200], 0.3, 0.05),
+  dig: () => blip([200, 130, 260, 80], 0.2, 0.06),
   crack: () => blip([220, 150, 190, 110], 0.12, 0.05),
   collapse: () => blip([420, 300, 210, 130, 80], 0.5, 0.06),
   fire: () => { if (muted) return; fireSound.currentTime = 0; fireSound.play().catch(() => {}); },

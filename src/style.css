@@ -80,11 +80,9 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 #bar { padding: 8px 14px 14px; display: grid; gap: 10px; }
 #hint { margin: 0; text-align: center; color: var(--muted); min-height: 2.6em; display: grid; place-items: center; }
-#buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 520px; width: 100%; margin: 0 auto; }
-#dpadToggle.on { background: var(--accent); color: #fff; }
-#dpadToggle.on span { color: #fff; }
+#buttons { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-width: 520px; width: 100%; margin: 0 auto; }
 
-/* On-screen direction pad (optional) */
+/* On-screen direction pad (touch screens only, always shown there) */
 #dpad {
   display: grid;
   grid-template-columns: repeat(3, 64px);

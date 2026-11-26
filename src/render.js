@@ -140,6 +140,45 @@ export function draw(tilesheet, spritesheet) {
     if (full) rect(3, 2, 1, 1, '#a8d8ff');
   };
 
+  // A pickaxe on an 8x8 grid of chunky pixels: wooden handle, grey head with darker tips.
+  const pickaxe = (x, y, size) => {
+    const u = size / 8;
+    const rect = (cx, cy, w, h, color) => {
+      const xa = Math.round(x + cx * u), ya = Math.round(y + cy * u);
+      ctx.fillStyle = color;
+      ctx.fillRect(xa, ya, Math.round(x + (cx + w) * u) - xa, Math.round(y + (cy + h) * u) - ya);
+    };
+    rect(3, 1, 2, 7, '#8b5a2b'); rect(3, 1, 1, 7, '#a9703a');          // handle
+    rect(1, 0, 6, 2, '#9ba0a8'); rect(1, 0, 6, 1, '#b8bcc3');          // head (duller grey than the bucket)
+    rect(0, 1, 1, 2, '#6f747c'); rect(7, 1, 1, 2, '#6f747c');          // tips
+  };
+
+  // A cracked wall: brick with a dark crack and loose, lighter chunks, so it reads as "can be smashed".
+  const wallCrackFx = (tx, ty) => {
+    const x0 = px(tx), y0 = py(ty), flip = hash(tx, ty, 9) > 0.5;
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.fillRect(x0, y0, T, T);
+    gridCells(CRACK, x0, y0, flip, '#14100e');
+    gridCells(BREAK, x0, y0, flip, 'rgba(20,16,14,0.7)');
+  };
+
+  // A wall smashed by the pickaxe: chunks fly out and drop, and a puff of dust.
+  const rubbleFx = (e) => {
+    const k = e.t / e.dur;
+    const x0 = px(e.gx), y0 = py(e.gy);
+    const cx = x0 + T / 2, cy = y0 + T / 2;
+    const sz = Math.max(2, Math.round(T * 0.12));
+    for (let i = 0; i < 9; i++) {
+      const ang = hash(i, 41) * 6.28;
+      const dist = (0.15 + 0.5 * hash(i, 42)) * T * Math.min(1, k * 2);
+      ctx.fillStyle = `rgba(${i % 2 ? '150,120,100' : '90,70,62'},${Math.max(0, 1 - k)})`;
+      ctx.fillRect(Math.round(cx + Math.cos(ang) * dist), Math.round(cy + Math.sin(ang) * dist + k * k * T * 0.4), sz, sz);
+    }
+    ctx.fillStyle = `rgba(200,190,180,${Math.max(0, 0.35 * (1 - k))})`;
+    const s = Math.round(T * (0.5 + 0.5 * k));
+    ctx.fillRect(Math.round(cx - s / 2), Math.round(cy - s / 2), s, s);
+  };
+
   // Droplets jumping up out of the water when the bucket is filled.
   const splashFx = (e) => {
     const k = e.t / e.dur;
@@ -224,6 +263,7 @@ export function draw(tilesheet, spritesheet) {
     for (let tx = 0; tx < game.w; tx++) {
       const ch = game.grid[ty][tx];
       if (ch === '#') cell('brick', tx, ty);
+      else if (ch === 'W') { cell('brick', tx, ty); wallCrackFx(tx, ty); }
       else if (ch === '~' || ch === 'w') cell('water', tx, ty);
       else {
         cell('floor', tx, ty);
@@ -231,6 +271,7 @@ export function draw(tilesheet, spritesheet) {
         else if (ch === 'D') cell('door', tx, ty);
         else if (ch === 'x' || ch === 'X') crackFx(tx, ty, ch === 'X');
         else if (ch === 'b') pail(px(tx) + T * 0.1, py(ty) + T * 0.1, T * 0.8, false);
+        else if (ch === 'p') pickaxe(px(tx) + T * 0.1, py(ty) + T * 0.1, T * 0.8);
       }
     }
   }
@@ -256,6 +297,7 @@ export function draw(tilesheet, spritesheet) {
     else if (e.type === 'crumble') crumbleFx(e);
     else if (e.type === 'splash') splashFx(e);
     else if (e.type === 'steam') steamFx(e);
+    else if (e.type === 'rubble') rubbleFx(e);
   }
 
   const t = player.moving ? Math.min(1, player.t) : 1;
@@ -306,6 +348,7 @@ export function draw(tilesheet, spritesheet) {
   } else if (game.mode === 'play') {
     ctx.drawImage(spritesheet, frame * SRC, 0, SRC, SRC, sx, sy, T, T);
     if (player.bucket) pail(sx + T * 0.5, sy + T * 0.45, T * 0.52, player.bucket === 'full');   // carried
+    else if (player.pickaxe) pickaxe(sx + T * 0.5, sy + T * 0.45, T * 0.52);
   }
 
   if (game.mode === 'dying' && game.deathCause !== 'collapse') {
