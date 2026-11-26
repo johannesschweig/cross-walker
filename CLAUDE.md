@@ -10,6 +10,7 @@ npm run dev                          # dev server, open http://localhost:8123
 npm run build                        # production build into dist/ (also writes dist/sw.js)
 npm run preview                      # serve dist/ on http://localhost:8123
 npm run check                        # verify levels: solvable, all gold collectable, par correct (-- --write fixes par)
+node tools/generate-levels.js        # propose new levels (prints ranked candidates, never edits levels.js; --help for options)
 tools/make-music-data.sh             # rebuild music-web.mp3 + music-data.js from music.mp3 (needs ffmpeg)
 vercel --prod                        # deploy (project "cross-walker"; Vercel runs the build and serves dist/)
 ```
@@ -43,7 +44,8 @@ There is no test suite or linter. After changing code run `npm run build` (catch
 
 - Crates make levels easy to break. Every level must pass `npm run check`: solvable, all gold collectable, correct `par`, border of bricks, exactly one `S` and one `D`. Changing a rule (like what crates do in fire) can shortcut or break existing levels: re-run the checker and compare step counts.
 - Audio: stream `src/assets/sounds/music-web.mp3` with an `<audio>` element. Don't fetch it: fetch fails in static previews. `music-data.js` is the Web Audio fallback, a 4 MB base64 ES module that `audio.js` loads with a dynamic `import()` only when streaming fails. `src/sw.js` must never handle audio, range requests or `music-data`.
-- `tools/check-levels.js` imports `src/levels.js` and mirrors `src/rules.js` in its own solver. Keep `levels.js` a plain module (`export const LEVELS = [...]`, closing `];` at column 0): `--write` rewrites it with a regex.
+- `tools/solver.js` is the solver, shared by `tools/check-levels.js` and `tools/generate-levels.js`. It mirrors `src/rules.js` in its own search state, so a rule change must be made in both places. The generator stamps gadgets (river + crate, fire + bucket + pool, cracked gate) onto a skeleton, filters with the solver, scores candidates and hill-climbs; it is offline only, so pick candidates by playing them, paste them into `levels.js` and run `npm run check`. A new mechanic needs a new gadget in `generate()` and a tile letter in `elements()` there.
+- `tools/check-levels.js` imports `src/levels.js`. Keep `levels.js` a plain module (`export const LEVELS = [...]`, closing `];` at column 0): `--write` rewrites it with a regex.
 - Module layering: `config`/`levels`/`dom`/`state` are leaves; `ui` and `rules` import from `input`, `render`, `audio`, `storage`; `game` imports `rules` and `ui`; only `main` knows everything. Don't import `game` or `rules` from `ui`/`input`: pass callbacks in from `main.js` (see `initInput`) to avoid import cycles.
 - The service worker file list and cache name are generated in `vite.config.js`, so there is nothing to bump by hand. The SW is only registered in production builds.
 - Game-wide state goes on the `game`/`player` objects in `state.js`: a module-level `let` can't be assigned from other modules.
