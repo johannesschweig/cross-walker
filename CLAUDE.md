@@ -60,5 +60,6 @@ There is no test suite or linter. After changing code run `npm run build` (catch
 
 - Vercel project `cross-walker` was created with the CLI. `vercel.json` sets the build command (`npm run build`) and output directory (`dist`). Pushes do not deploy until the project is connected to GitHub (`vercel git connect`).
 - `dist/` and `node_modules/` are git-ignored.
+- Work and commit directly on `main`. Don't create separate branches unless the user asks for one or the feature is very big.
 - Don't create Vercel protection-bypass secrets or change deployment protection without asking.
 - The `GITHUB_TOKEN` in this environment may be read-only; a push can fail with 403.
