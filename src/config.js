@@ -11,6 +11,8 @@ export const UNDO_LIMIT = 400;
 export const EXIT_TIME = 0.65;       // s the player takes to walk into the door
 export const BURN_TIME = 0.8;        // s a crate takes to burn up
 export const CRUMBLE_TIME = 0.45;    // s the dust of a cracked floor tile breaking further lasts
+export const SPLASH_TIME = 0.35;     // s the droplets of filling the bucket last
+export const STEAM_TIME = 0.6;       // s the steam of a fire going out lasts
 export const THREE_STAR_SLACK = 1.25; // 3 stars: all gold within par * this many steps
 
 // Position of each tile in the tile sheet: [column, row]

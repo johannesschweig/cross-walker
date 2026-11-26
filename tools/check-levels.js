@@ -11,6 +11,9 @@
  * bridge (walkable, crates can't enter it); a crate pushed into fire burns up (the fire stays);
  * cracked floor (x) can be stepped on once: when you step off it, it breaks (X) and stepping on it
  * again kills you, just like fire. Crates can't be pushed onto cracked floor.
+ * Bucket (b): picked up by walking onto it (one at a time). Moving into open water with an empty
+ * bucket fills it, moving into fire with a full one puts the fire out; either takes a step and the
+ * player stays put. Crates can't be pushed onto an unpicked bucket tile.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -36,14 +39,24 @@ function solve(rows) {
   }
   const full = (1 << golds.size) - 1;
   const bit = (x, y) => (golds.has(`${x},${y}`) ? 1 << golds.get(`${x},${y}`) : 0);
-  // `ch` = water cells filled with a crate (they are bridges now).
-  // `bk` = cracked floor cells that have been stepped on and left (they are broken now).
-  const key = (p, cr, ch, bk, m) =>
-    `${p}|${cr.map((c) => c.join()).sort().join(';')}|${[...ch].sort().join(';')}|${[...bk].sort().join(';')}|${m}`;
+  // State of a search node:
+  //   `ch` = water cells filled with a crate (they are bridges now)
+  //   `bk` = cracked floor cells that have been stepped on and left (they are broken now)
+  //   `bucket` = 0 none, 1 empty, 2 full; `ex` = fires put out; `pk` = bucket tiles picked up
+  const keyOf = (s) =>
+    `${s.p}|${s.cr.map((c) => c.join()).sort().join(';')}|${[...s.ch].sort().join(';')}|${[...s.bk].sort().join(';')}` +
+    `|${s.bucket}|${[...s.ex].sort().join(';')}|${[...s.pk].sort().join(';')}|${s.m}`;
 
-  const first = { p: start, cr: crates, ch: new Set(), bk: new Set(), m: bit(...start), push: 0, d: 0 };
+  const first = { p: start, cr: crates, ch: new Set(), bk: new Set(), bucket: 0, ex: new Set(), pk: new Set(),
+    m: bit(...start), push: 0, d: 0 };
   const queue = [first];
-  const seen = new Set([key(first.p, first.cr, first.ch, first.bk, first.m)]);
+  const seen = new Set([keyOf(first)]);
+  const add = (st) => {
+    const k = keyOf(st);
+    if (seen.has(k)) return;
+    seen.add(k);
+    queue.push(st);
+  };
   let shortest = null, par = null, bestGold = 0;
   for (let i = 0; i < queue.length; i++) {
     const st = queue[i];
@@ -55,21 +68,30 @@ function solve(rows) {
       continue;
     }
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const nx = px + dx, ny = py + dy;
-      const t = g[ny][nx];
+      const nx = px + dx, ny = py + dy, at = `${nx},${ny}`;
+      let t = g[ny][nx];
+      if ((t === 'F' && st.ex.has(at)) || (t === 'b' && st.pk.has(at))) t = '.';   // put out / picked up
       if (t === '#') continue;
-      if (t === 'F' || (t === '~' && !st.ch.has(`${nx},${ny}`))) continue;
-      if (t === 'x' && st.bk.has(`${nx},${ny}`)) continue;            // broken floor: deadly, like fire
+      if (t === '~' && !st.ch.has(at)) {            // open water: fills an empty bucket, else a wall
+        if (st.bucket === 1) add({ ...st, bucket: 2, d: st.d + 1 });
+        continue;
+      }
+      if (t === 'F') {                               // fire: a full bucket puts it out, else deadly
+        if (st.bucket === 2) add({ ...st, bucket: 1, ex: new Set(st.ex).add(at), d: st.d + 1 });
+        continue;
+      }
+      if (t === 'x' && st.bk.has(at)) continue;      // broken floor: deadly, like fire
       let cr = st.cr, ch = st.ch, push = 0;
       // leaving cracked floor breaks it (the start tile is never cracked, so this is a first visit)
       const bk = g[py][px] === 'x' ? new Set(st.bk).add(`${px},${py}`) : st.bk;
       const ci = cr.findIndex((c) => c[0] === nx && c[1] === ny);
       if (ci >= 0) {
-        const tx = nx + dx, ty = ny + dy;
-        const u = g[ty][tx];
+        const tx = nx + dx, ty = ny + dy, tk = `${tx},${ty}`;
+        let u = g[ty][tx];
+        if ((u === 'F' && st.ex.has(tk)) || (u === 'b' && st.pk.has(tk))) u = '.';
         if (cr.some((c) => c[0] === tx && c[1] === ty)) continue;
-        if (u === '~' && !ch.has(`${tx},${ty}`)) {                     // fills the water
-          ch = new Set(ch).add(`${tx},${ty}`);
+        if (u === '~' && !ch.has(tk)) {                                 // fills the water
+          ch = new Set(ch).add(tk);
           cr = cr.filter((_, j) => j !== ci);
         } else if (u === 'F') {                                         // burns up, fire stays
           cr = cr.filter((_, j) => j !== ci);
@@ -78,11 +100,9 @@ function solve(rows) {
         } else continue;
         push = 1;
       }
-      const m = st.m | bit(nx, ny);
-      const k = key([nx, ny], cr, ch, bk, m);
-      if (seen.has(k)) continue;
-      seen.add(k);
-      queue.push({ p: [nx, ny], cr, ch, bk, m, push: st.push + push, d: st.d + 1 });
+      let bucket = st.bucket, pk = st.pk;
+      if (t === 'b' && bucket === 0) { bucket = 1; pk = new Set(pk).add(at); }   // pick up (one at a time)
+      add({ p: [nx, ny], cr, ch, bk, bucket, ex: st.ex, pk, m: st.m | bit(nx, ny), push: st.push + push, d: st.d + 1 });
     }
   }
   return shortest && { moves: shortest.d, pushes: shortest.push, gold: golds.size, bestGold, par };
@@ -94,7 +114,7 @@ LEVELS.forEach((lv, i) => {
   const rows = lv.rows;
   const problems = [];
   if (!rows.every((r) => r.length === rows[0].length)) problems.push('rows have different lengths');
-  const unknown = [...new Set(rows.join('').replace(/[#.SDgF~cx]/g, ''))];
+  const unknown = [...new Set(rows.join('').replace(/[#.SDgF~cxb]/g, ''))];
   if (unknown.length) problems.push(`unknown tiles: ${unknown.join(' ')}`);
   if (rows.join('').split('S').length !== 2) problems.push('needs exactly one S');
   if (rows.join('').split('D').length !== 2) problems.push('needs exactly one D');

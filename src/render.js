@@ -122,6 +122,50 @@ export function draw(tilesheet, spritesheet) {
     }
   };
 
+  // A bucket on an 8x8 grid of chunky pixels: grey metal, a dark handle, and water at the rim when
+  // full. Used for the pickup on the floor and, smaller, for the one the player carries.
+  const pail = (x, y, size, full) => {
+    const u = size / 8;
+    const rect = (cx, cy, w, h, color) => {
+      const xa = Math.round(x + cx * u), ya = Math.round(y + cy * u);
+      ctx.fillStyle = color;
+      ctx.fillRect(xa, ya, Math.round(x + (cx + w) * u) - xa, Math.round(y + (cy + h) * u) - ya);
+    };
+    rect(2, 0, 4, 1, '#3b3f46'); rect(1, 1, 1, 1, '#3b3f46'); rect(6, 1, 1, 1, '#3b3f46');   // handle
+    rect(1, 2, 6, 1, '#c9ced6');                                                              // rim
+    rect(1, 3, 6, 2, full ? '#5b9bd5' : '#8a919c'); rect(2, 5, 4, 2, full ? '#4a86bf' : '#7a818c');   // body: blue when full
+    rect(1, 3, 1, 2, full ? '#8fc3ee' : '#a9b0ba'); rect(2, 5, 1, 2, full ? '#74aee0' : '#97a0ab');  // light edge
+    rect(2, 7, 4, 1, '#3b3f46');                                                              // base
+    rect(2, 2, 4, 1, full ? '#4aa3e8' : '#3b3f46');                                           // water / opening
+    if (full) rect(3, 2, 1, 1, '#a8d8ff');
+  };
+
+  // Droplets jumping up out of the water when the bucket is filled.
+  const splashFx = (e) => {
+    const k = e.t / e.dur;
+    const x0 = px(e.gx), y0 = py(e.gy);
+    const sz = Math.max(2, Math.round(T * 0.08));
+    for (let i = 0; i < 5; i++) {
+      ctx.fillStyle = `rgba(150,205,255,${Math.max(0, 1 - k)})`;
+      ctx.fillRect(
+        Math.round(x0 + (0.2 + 0.6 * hash(i, 31)) * T),
+        Math.round(y0 + T * 0.55 - Math.sin(k * Math.PI) * T * (0.2 + 0.3 * hash(i, 32))), sz, sz);
+    }
+  };
+
+  // Steam rising from a fire that was put out.
+  const steamFx = (e) => {
+    const k = e.t / e.dur;
+    const x0 = px(e.gx), y0 = py(e.gy);
+    const sz = Math.max(2, Math.round(T * 0.1));
+    for (let i = 0; i < 8; i++) {
+      ctx.fillStyle = `rgba(236,241,246,${Math.max(0, 0.85 * (1 - k))})`;
+      ctx.fillRect(
+        Math.round(x0 + (0.2 + 0.6 * hash(i, 21)) * T + Math.sin(k * 6 + i) * T * 0.05),
+        Math.round(y0 + T * 0.75 - k * T * (0.5 + 0.4 * hash(i, 22))), sz, sz);
+    }
+  };
+
   // Fire: a soft glow, a flame that breathes (smooth, bottom-anchored) and two rising embers.
   const fireFx = (tx, ty) => {
     const x0 = px(tx), y0 = py(ty), ph = hash(tx, ty) * 6.28;
@@ -186,6 +230,7 @@ export function draw(tilesheet, spritesheet) {
         if (ch === 'g') cell('gold', tx, ty);
         else if (ch === 'D') cell('door', tx, ty);
         else if (ch === 'x' || ch === 'X') crackFx(tx, ty, ch === 'X');
+        else if (ch === 'b') pail(px(tx) + T * 0.1, py(ty) + T * 0.1, T * 0.8, false);
       }
     }
   }
@@ -209,6 +254,8 @@ export function draw(tilesheet, spritesheet) {
   for (const e of game.effects) {
     if (e.type === 'burn') burnFx(e);
     else if (e.type === 'crumble') crumbleFx(e);
+    else if (e.type === 'splash') splashFx(e);
+    else if (e.type === 'steam') steamFx(e);
   }
 
   const t = player.moving ? Math.min(1, player.t) : 1;
@@ -220,7 +267,8 @@ export function draw(tilesheet, spritesheet) {
   // 3. the player
   const sx = px(player.fromX + (player.gx - player.fromX) * t);
   const sy = py(player.fromY + (player.gy - player.fromY) * t);
-  const frame = player.moving ? 1 + (player.steps % (FRAMES - 1)) : 0;
+  const walking = player.moving && (player.gx !== player.fromX || player.gy !== player.fromY);
+  const frame = walking ? 1 + (player.steps % (FRAMES - 1)) : 0;
   if (game.mode === 'dying') {
     const k = game.modeTime / DEATH_TIME;
     const collapse = game.deathCause === 'collapse';
@@ -257,6 +305,7 @@ export function draw(tilesheet, spritesheet) {
     }
   } else if (game.mode === 'play') {
     ctx.drawImage(spritesheet, frame * SRC, 0, SRC, SRC, sx, sy, T, T);
+    if (player.bucket) pail(sx + T * 0.5, sy + T * 0.45, T * 0.52, player.bucket === 'full');   // carried
   }
 
   if (game.mode === 'dying' && game.deathCause !== 'collapse') {

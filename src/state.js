@@ -6,6 +6,7 @@ export const player = {
   t: 1, moving: false,          // progress of the current step, 0..1
   pushed: null,                 // crate being pushed during this step
   steps: 0,
+  bucket: null,                 // carried bucket: null (none) | 'empty' | 'full'
 };
 
 export const game = {

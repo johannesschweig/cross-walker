@@ -1,6 +1,6 @@
 # Cross Walker
 
-A tiny puzzle game for phones: collect gold, dodge fire, bridge rivers with crates, don't trust cracked floor. 14 levels, each with up to three stars. Plain HTML/CSS/JavaScript, bundled with [Vite](https://vite.dev).
+A tiny puzzle game for phones: collect gold, dodge fire, bridge rivers with crates, put out fires with a bucket, don't trust cracked floor. 15 levels, each with up to three stars. Plain HTML/CSS/JavaScript, bundled with [Vite](https://vite.dev).
 
 **Play:** https://cross-walker.vercel.app
 
@@ -14,6 +14,7 @@ Originally a Godot 4.3 prototype; that version is in the git history.
 - **Water** blocks you. Push a **crate** into it and it floats there as a bridge.
 - Push a **crate into fire** and the crate burns up (the fire stays). That's how you get rid of a crate you don't need.
 - **Cracked floor** holds you once. Step off it and it breaks; step on it again and it collapses under you, like fire. Crates can't be pushed onto it.
+- **Bucket:** walk onto it to pick it up (one at a time). Walk into **water** to fill it, walk into **fire** to put the fire out (one fill, one fire). You stay where you are, but it costs a step. A bucket is only carried within one level.
 - Crates move one tile in a straight line. They can't be pulled or pushed onto a bridge.
 - **Stars:** ★ for finishing, ★★ for also collecting all the gold, ★★★ for doing that within 25% of par (the fewest steps that collect all the gold). Your best result per level is saved.
 
@@ -23,7 +24,7 @@ Originally a Godot 4.3 prototype; that version is in the git history.
 | Restart level | Restart button | R |
 | Undo last step | – | Z or Backspace |
 | Sound | Sound button | M |
-| Pick a level | Tap "Level n/14" | Click "Level n/14" |
+| Pick a level | Tap "Level n/15" | Click "Level n/15" |
 
 The game is portrait-only. Progress, sound and d-pad settings are saved in the browser.
 
@@ -56,7 +57,7 @@ Levels are the `LEVELS` array in `src/levels.js`: text grids with a brick border
 | `.` | floor | | `~` | water |
 | `S` | start (one) | | `c` | crate |
 | `D` | door (one) | | `g` | gold |
-| `x` | cracked floor | | | |
+| `x` | cracked floor | | `b` | bucket |
 
 Crates make levels easy to break, so check them after every change. The checker confirms each level is solvable with all its gold collectable, and that `par` is right (`--write` fixes wrong par values):
 

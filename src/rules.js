@@ -1,6 +1,6 @@
 // The rules of one step: what can be walked on, what a pushed crate does, what kills you.
 // `tools/check-levels.js` mirrors these rules in a solver, so keep the two in sync.
-import { DIRS, MOVE_TIME, BURN_TIME, CRUMBLE_TIME, UNDO_LIMIT } from './config.js';
+import { DIRS, MOVE_TIME, BURN_TIME, CRUMBLE_TIME, SPLASH_TIME, STEAM_TIME, UNDO_LIMIT } from './config.js';
 import { game, player, tileAt, crateAt } from './state.js';
 import { sfx } from './audio.js';
 import { clearInput } from './input.js';
@@ -9,29 +9,60 @@ import { snapshot } from './undo.js';
 
 const crateCanEnter = (gx, gy) => {
   const ch = tileAt(gx, gy);
-  // floor, gold, open water or fire (the crate burns up): never bricks, the door, a bridge or
-  // cracked floor ('x' / 'X')
+  // floor, gold, open water or fire (the crate burns up): never bricks, the door, a bridge,
+  // cracked floor ('x' / 'X') or a bucket ('b')
   return (ch === '.' || ch === 'g' || ch === '~' || ch === 'F') && !crateAt(gx, gy);
 };
+
+// Every step, walking or not, is one undo state and one count on the step counter.
+function commitStep() {
+  game.undo.push(snapshot());
+  if (game.undo.length > UNDO_LIMIT) game.undo.shift();
+  game.moves++;
+  updateHud();
+}
+
+// Using the bucket: an empty one is filled at open water, a full one puts out fire. The player
+// stays where they are, but it takes a step.
+function useBucket(tx, ty) {
+  if (player.bucket === 'empty') {
+    player.bucket = 'full';
+    game.effects.push({ type: 'splash', gx: tx, gy: ty, t: 0, dur: SPLASH_TIME });
+    sfx.fill();
+  } else {
+    player.bucket = 'empty';
+    game.grid[ty][tx] = '.';                // the fire is gone for good: plain floor
+    game.effects.push({ type: 'steam', gx: tx, gy: ty, t: 0, dur: STEAM_TIME });
+    sfx.douse();
+  }
+}
 
 /** Starts a step in direction `name`. Returns true if the step started. */
 export function startStep(name, carry) {
   const d = DIRS[name];
   const nx = player.gx + d.x, ny = player.gy + d.y;
   const ch = tileAt(nx, ny);
-  if (ch === '#' || ch === '~') return false;
+  if (ch === '#') return false;
 
-  const crate = crateAt(nx, ny);
+  const bucketUse = (ch === '~' && player.bucket === 'empty') || (ch === 'F' && player.bucket === 'full');
+  if (ch === '~' && !bucketUse) return false;
+
+  const crate = bucketUse ? null : crateAt(nx, ny);
   if (crate) {
     const tx = nx + d.x, ty = ny + d.y;
     if (!crateCanEnter(tx, ty)) return false;
     crate.toX = tx; crate.toY = ty;
     sfx.push();
   }
-  game.undo.push(snapshot());
-  if (game.undo.length > UNDO_LIMIT) game.undo.shift();
-  game.moves++;
-  updateHud();
+  commitStep();
+  if (bucketUse) {
+    useBucket(nx, ny);
+    player.fromX = player.gx; player.fromY = player.gy;    // no movement, but the step takes its time
+    player.pushed = null;
+    player.moving = true;
+    player.t = carry / MOVE_TIME;
+    return true;
+  }
   if (tileAt(player.gx, player.gy) === 'x') {      // leaving cracked floor: it breaks further
     game.grid[player.gy][player.gx] = 'X';
     game.effects.push({ type: 'crumble', gx: player.gx, gy: player.gy, t: 0, dur: CRUMBLE_TIME });
@@ -82,6 +113,10 @@ export function finishStep() {
     game.gold++;
     sfx.gold();
     updateHud();
+  } else if (ch === 'b' && !player.bucket) {      // pick up a bucket (one at a time; a second is left)
+    game.grid[player.gy][player.gx] = '.';
+    player.bucket = 'empty';
+    sfx.pickup();
   } else if (ch === 'D') {
     game.mode = 'exiting';                 // walk into the door, then show the result
     game.modeTime = 0;

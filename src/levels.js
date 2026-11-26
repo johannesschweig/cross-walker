@@ -3,6 +3,7 @@
 // ~  water (solid)     g  gold             D  door (level goal)
 // F  fire (deadly)     c  crate (pushable)
 // x  cracked floor: holds one visit. Step off it and it breaks; stepping on it again kills you.
+// b  bucket: pick it up, walk into water to fill it, walk into fire to put the fire out (once per fill).
 // Internally a filled water tile becomes 'w' (water with a floating crate; walkable) and a
 // cracked tile that was left becomes 'X' (broken).
 // `par` = fewest steps that collect all gold and reach the door.
@@ -202,6 +203,20 @@ export const LEVELS = [
       "#D###.#x#x#",
       "#.###.~.c.#",
       "#..xg.#..g#",
+      "###########",
+    ],
+  },
+  {
+    name: "Bucket Brigade",
+    hint: "Walk into water to fill the bucket, into fire to put it out.",
+    par: 38,
+    rows: [
+      "###########",
+      "#S...#..Fg#",
+      "#.b..#...##",
+      "#...~#...##",
+      "#....F..###",
+      "#g...#.F.D#",
       "###########",
     ],
   },
