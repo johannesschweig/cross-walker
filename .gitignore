@@ -1,3 +1,5 @@
 .DS_Store
 *.afdesign~lock~
 .vercel
+node_modules
+dist

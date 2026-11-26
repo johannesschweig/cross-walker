@@ -1,23 +1,21 @@
 #!/usr/bin/env node
 /*
- * Checks every level in game.js: well-formed, solvable, all gold collectable on a run that ends
+ * Checks every level in src/levels.js: well-formed, solvable, all gold collectable on a run that ends
  * at the door, and `par` correct (par = fewest steps that collect all gold and reach the door).
  * Also prints the shortest way to the door (steps / crate pushes).
  *
  *   node tools/check-levels.js          check; exit code 1 if anything is wrong
- *   node tools/check-levels.js --write  also fix wrong `par` values in game.js
+ *   node tools/check-levels.js --write  also fix wrong `par` values in src/levels.js
  *
- * Rules mirrored from game.js: fire is never stepped on; a crate pushed into water becomes a
+ * Rules mirrored from src/rules.js: fire is never stepped on; a crate pushed into water becomes a
  * bridge (walkable, crates can't enter it); a crate pushed into fire burns up (the fire stays).
  */
-const fs = require('fs');
-const path = require('path');
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const file = path.join(__dirname, '..', 'game.js');
-const src = fs.readFileSync(file, 'utf8');
-const match = src.match(/const LEVELS = (\[[\s\S]*?\n  \]);/);
-if (!match) { console.error('Could not find LEVELS in game.js'); process.exit(1); }
-const LEVELS = new Function(`return ${match[1]};`)();
+const file = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'levels.js');
+const { LEVELS } = await import(pathToFileURL(file).href);
 
 function solve(rows) {
   const H = rows.length, W = rows[0].length;
@@ -112,10 +110,10 @@ LEVELS.forEach((lv, i) => {
 
 if (failed && process.argv.includes('--write') && pars.every((p) => p !== undefined)) {
   let n = 0;
-  const fixed = src.replace(/const LEVELS = \[[\s\S]*?\n  \];/, (block) =>
+  const fixed = fs.readFileSync(file, 'utf8').replace(/export const LEVELS = \[[\s\S]*?\n\];/, (block) =>
     block.replace(/par: \d+,/g, () => `par: ${pars[n++]},`));
   fs.writeFileSync(file, fixed);
-  console.log(`\nWrote ${n} par values to game.js. Run again to confirm.`);
+  console.log(`\nWrote ${n} par values to src/levels.js. Run again to confirm.`);
   process.exit(0);
 }
 process.exit(failed ? 1 : 0);

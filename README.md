@@ -1,6 +1,6 @@
 # Cross Walker
 
-A tiny puzzle game for phones: collect gold, dodge fire, bridge rivers with crates. 13 levels, each with up to three stars. Plain HTML/CSS/JavaScript, no build step.
+A tiny puzzle game for phones: collect gold, dodge fire, bridge rivers with crates. 13 levels, each with up to three stars. Plain HTML/CSS/JavaScript, bundled with [Vite](https://vite.dev).
 
 **Play:** https://cross-walker.vercel.app
 
@@ -29,14 +29,17 @@ The game is portrait-only. Progress, sound and d-pad settings are saved in the b
 ## Run locally
 
 ```bash
-python3 -m http.server 8123
+npm install
+npm run dev
 ```
 
-Open http://localhost:8123, or `http://<your-computer's-ip>:8123` on a phone on the same Wi-Fi.
+Open http://localhost:8123, or `http://<your-computer's-ip>:8123` on a phone on the same Wi-Fi (the dev server listens on the network when started with `npm run dev -- --host`).
+
+`npm run build` writes the site to `dist/`; `npm run preview` serves that build locally.
 
 ## Deploy
 
-Static site, nothing to build:
+Static site; Vercel runs `npm run build` and serves `dist/`:
 
 ```bash
 vercel --prod
@@ -44,7 +47,7 @@ vercel --prod
 
 ## Editing levels
 
-Levels are the `LEVELS` array at the top of `game.js`: text grids with a brick border, drawn as large as fits. Each has a `par` (see Stars above).
+Levels are the `LEVELS` array in `src/levels.js`: text grids with a brick border, drawn as large as fits. Each has a `par` (see Stars above).
 
 | Char | Tile | | Char | Tile |
 | --- | --- | --- | --- | --- |
@@ -56,11 +59,11 @@ Levels are the `LEVELS` array at the top of `game.js`: text grids with a brick b
 Crates make levels easy to break, so check them after every change. The checker confirms each level is solvable with all its gold collectable, and that `par` is right (`--write` fixes wrong par values):
 
 ```bash
-node tools/check-levels.js
+npm run check
 ```
 
 ## Music
 
-`assets/sounds/music.mp3` is the original track. The game streams a smaller 128 kbps copy (`music-web.mp3`) and falls back to `music-data.js` (the same copy as text) where streaming isn't possible. Rebuild both with `tools/make-music-data.sh` (needs ffmpeg).
+`assets-src/sounds/music.mp3` is the original track. The game streams a smaller 128 kbps copy (`src/assets/sounds/music-web.mp3`) and falls back to `music-data.js` (the same copy as text, loaded only when needed) where streaming isn't possible. Rebuild both with `tools/make-music-data.sh` (needs ffmpeg).
 
 More details for contributors are in [CLAUDE.md](CLAUDE.md).

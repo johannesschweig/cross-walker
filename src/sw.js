@@ -1,12 +1,11 @@
 /* Minimal service worker: makes the game load instantly and work offline.
  * - Pages, scripts and art: network first (so a new deploy is picked up), cached copy when offline.
- * - Audio is never handled here: <audio> sends byte-range requests, which a cache can't answer. */
-const CACHE = 'cross-walker-v1';
-const CORE = [
-  './', 'index.html', 'style.css', 'game.js', 'manifest.webmanifest',
-  'assets/tilesheet.png', 'assets/spritesheet.png',
-  'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
-];
+ * - Audio is never handled here: <audio> sends byte-range requests, which a cache can't answer.
+ *
+ * This is a template. `vite build` (see vite.config.js) fills in the cache name and the list of
+ * files to precache below and writes the result to dist/sw.js, so it can't run as it is. */
+const CACHE = '__CACHE__';
+const CORE = __PRECACHE__;
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE)).then(() => self.skipWaiting()));
@@ -23,7 +22,7 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   const url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== location.origin) return;
-  if (/\.(mp3|ogg|wav)$/i.test(url.pathname) || url.pathname.endsWith('music-data.js') || req.headers.has('range')) return;
+  if (/\.(mp3|ogg|wav)$/i.test(url.pathname) || /music-data/.test(url.pathname) || req.headers.has('range')) return;
   e.respondWith(
     fetch(req)
       .then((res) => {

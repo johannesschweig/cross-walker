@@ -1,5 +1,4 @@
-# Source files that don't need to be served
+# Source files that don't need to be uploaded
 tools/
-assets/*.afdesign
-assets/sounds/music.mp3
+assets-src/
 README.md

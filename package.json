@@ -1,0 +1,21 @@
+{
+  "name": "cross-walker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A tiny puzzle game for phones: collect gold, dodge fire, bridge rivers with crates.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "node tools/check-levels.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/johannesschweig/cross-walker.git"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "vite": "^8.3.8"
+  }
+}
