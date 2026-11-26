@@ -16,9 +16,10 @@
  *     traps      also compute `trap`: the share of states (not at the door) from which the level can
  *                no longer be won with all gold. 0 = every mistake can be undone by walking on.
  *   returns null when the door can't be reached, else
- *     { moves, pushes, gold, bestGold, par, states, trap? }
+ *     { moves, pushes, gold, bestGold, par, states, parPushes?, trap?, optimal? }
  *     moves = shortest way to the door, par = shortest way that also collects all gold (null if
- *     impossible), pushes = crate pushes on the shortest way.
+ *     impossible), pushes = crate pushes on the shortest way, parPushes = crate pushes on a par
+ *     solution, optimal = number of distinct par solutions (with `traps` only).
  */
 export function solve(rows, { maxStates = Infinity, traps = false } = {}) {
   const H = rows.length, W = rows[0].length;
@@ -63,14 +64,14 @@ export function solve(rows, { maxStates = Infinity, traps = false } = {}) {
     if (edges) edges.push(cur, j);
   };
   const atDoor = (st) => st.p[0] === door[0] && st.p[1] === door[1];
-  let shortest = null, par = null, bestGold = 0;
+  let shortest = null, parState = null, par = null, bestGold = 0;
   for (let i = 0; i < queue.length; i++) {
     cur = i;
     const st = queue[i];
     const [px, py] = st.p;
     if (atDoor(st)) {
       if (!shortest) shortest = st;
-      if (par === null && st.m === full) par = st.d;
+      if (par === null && st.m === full) { par = st.d; parState = st; }
       bestGold = Math.max(bestGold, st.m.toString(2).split('1').length - 1);
       continue;
     }
@@ -115,7 +116,24 @@ export function solve(rows, { maxStates = Infinity, traps = false } = {}) {
   if (truncated) return { truncated: true, states: queue.length };
   if (!shortest) return null;
   const result = { moves: shortest.d, pushes: shortest.push, gold: golds.size, bestGold, par, states: queue.length };
+  if (parState) {
+    result.parPushes = parState.push;
+    // what a par solution has to use: fires put out (each needs its own bucket fill), cracked tiles crossed
+    result.parDouse = parState.ex.size;
+    result.parCrack = parState.bk.size;
+  }
   if (traps) {
+    // Number of different shortest solutions (paths through the state graph that reach the door with
+    // all gold in `par` steps). Open rooms have thousands, tight puzzles a handful.
+    if (parState) {
+      const ways = new Float64Array(queue.length);
+      ways[0] = 1;
+      for (let e = 0; e < edges.length; e += 2) {
+        if (queue[edges[e + 1]].d === queue[edges[e]].d + 1) ways[edges[e + 1]] += ways[edges[e]];
+      }
+      result.optimal = 0;
+      queue.forEach((st, i) => { if (atDoor(st) && st.m === full && st.d === par) result.optimal += ways[i]; });
+    }
     // Walk the state graph backwards from every winning state (door, all gold). A state that is not
     // reached can no longer be won. Door states end the level, so they are not counted as traps.
     const back = Array.from({ length: queue.length }, () => []);
